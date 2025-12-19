@@ -1,0 +1,50 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+
+<div class="container mt-4" style="max-width: 450px;">
+  <h4>{{ action }} Exchange Rate</h4>
+  <hr>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+        <label>Country</label>
+        <select name="country" id="id_country" class="form-control" required>
+            <option value="">Select Country</option>
+            {% for country in countries %}
+                <option value="{{ country.id }}" 
+                    {% if rate and rate.country.id == country.id %}selected{% endif %}>
+                    {{ country.name }} ({{ country.code }})
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Currency</label>
+        <select name="currency" id="id_currency" class="form-control" required>
+            <option value="">Select Currency</option>
+            {% for currency in currencies %}
+                <option value="{{ currency.id }}" 
+                    {% if rate and rate.currency.id == currency.id %}selected{% endif %}>
+                    {{ currency.code }} - {{ currency.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Rate To UGX</label>
+        <input type="number" step="0.0001" name="rate_to_ugx" class="form-control"
+               required value="{{ rate.rate_to_ugx|default:'' }}">
+        <small class="text-muted">Value of 1 {{ rate.currency.code|default:"Currency" }} in UGX</small>
+    </div>
+
+    <button class="btn btn-success">{{ action }}</button>
+    <a href="{% url 'exchange_rate_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+
+</div>
+
+{% endblock %}

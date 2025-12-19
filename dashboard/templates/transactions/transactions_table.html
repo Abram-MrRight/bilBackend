@@ -1,0 +1,103 @@
+{% load humanize %}
+<table class="table table-hover">
+    <thead table-success>
+        <tr>
+            <th>Date</th>
+            <th>Ref</th>
+            <th>Sender</th>
+            <th>Receiver</th>
+            <th>Contact</th>
+            <th>Amount</th>
+            <th>Currency</th>
+            <th>Country</th>
+            <th>Fee</th>
+            <th>Net</th>
+            <th>Confirmed By</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in transactions %}
+        <tr>
+            <td>
+                <div class="small">{{ t.confirmed_at|date:"M d, Y" }}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">{{ t.confirmed_at|time:"H:i" }}</div>
+            </td>
+            <td><code>{{ t.transaction_reference|truncatechars:8 }}</code></td>
+            <td>{{ t.sender_name|truncatechars:12 }}</td>
+            <td>{{ t.receiver_name|truncatechars:12 }}</td>
+            <td>{{ t.receiver_contact|default:"-"|truncatechars:10 }}</td>
+            <td class="amount amount-total">{{ t.amount|intcomma }}</td>
+            <td><span class="badge">{{ t.currency }}</span></td>
+            <td>
+                {% if t.charge_rule and t.charge_rule.country %}
+                    {{ t.charge_rule.country.name|truncatechars:10 }}
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </td>
+            <td class="amount amount-charge">{{ t.charge_amount|intcomma }}</td>
+            <td class="amount amount-net fw-bold">{{ t.net_amount|intcomma }}</td>
+            <td>
+                {% if t.confirmed_by %}
+                    <div class="small">{{ t.confirmed_by.fullname|truncatechars:10 }}</div>
+                {% else %}
+                    <span class="text-muted small">System</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="11" class="text-center py-4">
+                <i class="bi bi-receipt fs-3 text-muted d-block mb-2"></i>
+                <div class="text-muted">No transactions found</div>
+                <small class="text-muted">Try adjusting your filters</small>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div class="d-flex justify-content-between align-items-center mt-3 px-3 pb-3">
+    <div class="text-muted small">
+        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+    </div>
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" 
+                   href="?page={{ page_obj.previous_page_number }}{% if clean_query %}&{{ clean_query }}{% endif %}">
+                    ‹ Previous
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <li class="page-item">
+                    <a class="page-link" 
+                       href="?page={{ num }}{% if clean_query %}&{{ clean_query }}{% endif %}">
+                        {{ num }}
+                    </a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" 
+                   href="?page={{ page_obj.next_page_number }}{% if clean_query %}&{{ clean_query }}{% endif %}">
+                    Next ›
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% endif %}

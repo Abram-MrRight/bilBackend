@@ -1,0 +1,211 @@
+{% extends 'dashboard/base.html' %}
+{% load humanize %}
+{% load static %}
+{% block content %}
+ <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'dashboard/css/transactions.css' %}">
+
+
+<div class="dashboard-wrapper">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="fw-bold mb-1">Transactions Management</h4>
+                <p class="mb-0 opacity-90">Track all money transfer transactions with currency breakdown</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card">
+        <form method="get" id="filterForm">
+            <div class="filter-row">
+                <input type="date" name="date_from" value="{{ request.GET.date_from }}" 
+                       class="filter-input" placeholder="From Date">
+                
+                <input type="date" name="date_to" value="{{ request.GET.date_to }}" 
+                       class="filter-input" placeholder="To Date">
+                
+                <input type="text" name="sender" value="{{ request.GET.sender }}" 
+                       class="filter-input" placeholder="Sender Name">
+                
+                <input type="text" name="receiver" value="{{ request.GET.receiver }}" 
+                       class="filter-input" placeholder="Receiver Name">
+                
+                <select name="currency" class="filter-input">
+                    <option value="">All Currencies</option>
+                    <option value="USD" {% if request.GET.currency == 'USD' %}selected{% endif %}>USD</option>
+                    <option value="UGX" {% if request.GET.currency == 'UGX' %}selected{% endif %}>UGX</option>
+                </select>
+                
+                <input type="text" name="confirmed_by" value="{{ request.GET.confirmed_by }}" 
+                       class="filter-input" placeholder="Confirmed By">
+            </div>
+            
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel me-1"></i> Apply Filters
+                </button>
+                
+                <button type="button" id="resetBtn" class="btn btn-secondary">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Reset
+                </button>
+                
+                <div class="ms-auto d-flex gap-2">
+                    <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}download_format=excel" 
+                       class="btn btn-success">
+                        <i class="bi bi-file-excel me-1"></i> Excel
+                    </a>
+                    <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}download_format=pdf" 
+                       class="btn btn-success">
+                        <i class="bi bi-file-pdf me-1"></i> PDF
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Filtered Summary (if filters applied) -->
+    {% if request.GET %}
+    <div class="exchange-info">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Filtered Results:</strong>
+                Showing {{ filtered_count|default:"0" }} transactions
+            </div>
+            <div class="text-end">
+                <small>USD: {{ filtered_usd_count|default:"0" }} | UGX: {{ filtered_ugx_count|default:"0" }}</small>
+            </div>
+        </div>
+        <div class="mt-2 row">
+            <div class="col-md-3">
+                <small class="text-muted">USD Total: ${{ filtered_usd_total_amount|default:"0"|intcomma }}</small>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">UGX Total: {{ filtered_ugx_total_amount|default:"0"|intcomma }} UGX</small>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Total in UGX: {{ filtered_total_amount_ugx|floatformat:2|intcomma }} UGX</small>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Charges in UGX: {{ filtered_total_charges_ugx|floatformat:2|intcomma }} UGX</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Table -->
+    <div class="table-card">
+        <div class="table-header">
+            <h6 class="mb-0">
+                <i class="bi bi-receipt me-2"></i>
+                All Transactions ({{ page_obj.paginator.count|default:transactions.count }})
+            </h6>
+        </div>
+        
+        <div class="table-responsive" id="transactionsContainer">
+            {% include 'transactions/transactions_table.html' %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Real-time filtering with debounce
+    let filterTimeout;
+    const filterFields = ['date_from', 'date_to', 'sender', 'receiver', 'currency', 'confirmed_by'];
+    
+    // Get all filter inputs
+    const filterInputs = filterFields.map(id => document.getElementById(id)).filter(Boolean);
+    
+    // Add event listeners for real-time filtering
+    filterInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            clearTimeout(filterTimeout);
+            filterTimeout = setTimeout(applyFilters, 500);
+        });
+    });
+    
+    // Date fields trigger on change too
+    document.getElementById('date_from')?.addEventListener('change', applyFilters);
+    document.getElementById('date_to')?.addEventListener('change', applyFilters);
+    
+    // Select fields
+    document.querySelector('select[name="currency"]')?.addEventListener('change', applyFilters);
+    
+    // Reset filters
+    document.getElementById('resetBtn').addEventListener('click', function() {
+        filterInputs.forEach(input => input.value = '');
+        document.querySelector('select[name="currency"]').selectedIndex = 0;
+        applyFilters();
+    });
+    
+    function applyFilters() {
+        const formData = new FormData(document.getElementById('filterForm'));
+        const params = new URLSearchParams();
+        
+        // Collect form values
+        for (let [key, value] of formData.entries()) {
+            if (value && value.trim() !== '') {
+                params.append(key, value);
+            }
+        }
+        
+        // Show loading state
+        const container = document.getElementById('transactionsContainer');
+        container.innerHTML = `
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <div class="text-muted mt-2">Loading transactions...</div>
+            </div>
+        `;
+        
+        // Fetch filtered results
+        fetch(`?${params.toString()}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.text();
+        })
+        .then(html => {
+            container.innerHTML = html;
+            // Update URL without page reload
+            window.history.replaceState({}, '', `?${params.toString()}`);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            container.innerHTML = `
+                <div class="loading-container">
+                    <i class="bi bi-exclamation-triangle text-danger fs-3"></i>
+                    <div class="mt-2 text-danger">Error loading transactions</div>
+                    <button onclick="applyFilters()" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="bi bi-arrow-clockwise"></i> Retry
+                    </button>
+                </div>
+            `;
+        });
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + F focuses search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            document.getElementById('sender')?.focus();
+        }
+        
+        // Escape clears filters
+        if (e.key === 'Escape') {
+            document.getElementById('resetBtn')?.click();
+        }
+    });
+});
+</script>
+{% endblock %}

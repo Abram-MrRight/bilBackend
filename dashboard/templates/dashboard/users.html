@@ -1,0 +1,65 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<h4 class="mb-3">All Users</h4>
+
+<div class="row mb-3">
+  <div class="col-md-4">
+    <input type="text" id="user-search" class="form-control" placeholder="Search by name...">
+  </div>
+  <div class="col-md-3">
+    <select id="user-role-filter" class="form-select">
+      <option value="">All Roles</option>
+      <option value="admin">Admin</option>
+      <option value="client">Client</option>
+    </select>
+  </div>
+</div>
+
+<table class="table table-striped table-bordered">
+  <thead class="table-dark">
+    <tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Date Joined</th><th>Action</th></tr>
+  </thead>
+  <tbody id="users-table-body">
+    {% for u in users %}
+    <tr>
+      <td>{{ u.id }}</td>
+      <td id="name-{{ u.id }}">{{ u.fullname }}</td>
+      <td id="email-{{ u.id }}">{{ u.email }}</td>
+      <td id="role-{{ u.id }}">{{ u.role }}</td>
+      <td>{{ u.date_joined|date:"Y-m-d" }}</td>
+      <td><button class="btn btn-sm btn-primary edit-user" data-id="{{ u.id }}">Edit</button></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+function fetchUsers(){
+  const query = document.getElementById('user-search').value
+  const role = document.getElementById('user-role-filter').value
+
+  fetch(`/users/search/?q=${query}&role=${role}`)
+    .then(res => res.json())
+    .then(data => {
+      const tbody = document.getElementById('users-table-body')
+      tbody.innerHTML = ''
+      data.users.forEach(u => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${u.id}</td>
+            <td id="name-${u.id}">${u.fullname}</td>
+            <td id="email-${u.id}">${u.email}</td>
+            <td id="role-${u.id}">${u.role}</td>
+            <td>${u.date_joined}</td>
+            <td><button class="btn btn-sm btn-primary edit-user" data-id="${u.id}">Edit</button></td>
+          </tr>
+        `
+      })
+    })
+}
+
+// Event listeners
+document.getElementById('user-search').addEventListener('input', fetchUsers)
+document.getElementById('user-role-filter').addEventListener('change', fetchUsers)
+</script>
+{% endblock %}

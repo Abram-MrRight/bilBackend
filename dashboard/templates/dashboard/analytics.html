@@ -1,0 +1,866 @@
+{% extends 'dashboard/base.html' %}
+{% load humanize %}
+{% load static %}
+{% block content %}
+<!-- CSS -->
+<link rel="stylesheet" href="{% static 'dashboard/css/analystics.css' %}">
+
+<div class="container-fluid analytics-container">
+
+    <!-- ===== EXECUTIVE HEADER ===== -->
+    <div class="executive-analytics-header">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="fw-bold mb-2">Financial Analytics Dashboard</h1>
+                <p class="lead opacity-85 mb-0">Accurate transaction insights based on real-time data</p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <div class="bg-white bg-opacity-10 backdrop-blur rounded-pill d-inline-flex align-items-center px-4 py-2">
+                    <i class="bi bi-currency-exchange me-2"></i>
+                    <span>1 USD = {{ exchange_rate|default:3800|floatformat:2 }} UGX</span>
+                    <span class="mx-2 opacity-50">•</span>
+                    <span>Updated: Now</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ACCURATE KPI OVERVIEW ===== -->
+    <div class="row g-4 mb-4">
+        <!-- Total Transactions -->
+        <div class="col-xl-3 col-md-6">
+            <div class="analytics-card-premium animate-fade-in">
+                <div class="card-body p-4">
+                    <div class="analytics-icon-premium">
+                        <i class="bi bi-receipt"></i>
+                    </div>
+                    <div>
+                        <div class="analytics-label-premium">Total Transactions</div>
+                        <div class="analytics-value-premium">{{ total_transactions|intcomma }}</div>
+                        <div class="small text-muted mt-2">
+                            <span class="badge bg-primary me-1">{{ usd_count|default:0 }} USD</span>
+                            <span class="badge bg-success">{{ ugx_count|default:0 }} UGX</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Sent (UGX Equivalent) -->
+        <div class="col-xl-3 col-md-6">
+            <div class="gradient-card animate-fade-in delay-1" 
+                 style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                <div class="icon-bg">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <div>
+                    <div class="label-sm">Total Sent (UGX Equivalent)</div>
+                    <div class="value-lg">{{ total_amount_ugx|default:0|floatformat:0|intcomma }}</div>
+                    <div class="small opacity-85 mt-2">
+                        <i class="bi bi-calculator me-1"></i>
+                        <span>Combined USD + UGX</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Charges (UGX Equivalent) -->
+        <div class="col-xl-3 col-md-6">
+            <div class="gradient-card animate-fade-in delay-2"
+                 style="background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);">
+                <div class="icon-bg">
+                    <i class="bi bi-cash-coin"></i>
+                </div>
+                <div>
+                    <div class="label-sm">Total Charges (UGX)</div>
+                    <div class="value-lg">{{ total_charges_ugx|default:0|floatformat:0|intcomma }}</div>
+                    <div class="small opacity-85 mt-2">
+                        <i class="bi bi-graph-up me-1"></i>
+                        <span>Fees & Commissions</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Net Amount -->
+        <div class="col-xl-3 col-md-6">
+            <div class="gradient-card animate-fade-in delay-3"
+                 style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
+                <div class="icon-bg">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+                <div>
+                    <div class="label-sm">Total Net Amount</div>
+                    <div class="value-lg">{{ total_net|default:0|floatformat:0|intcomma }}</div>
+                    <div class="small opacity-85 mt-2">
+                        <i class="bi bi-currency-exchange me-1"></i>
+                        <span>After charges deduction</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FINANCIAL SUMMARY TABLE ===== -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="chart-container-premium">
+                <div class="chart-header d-flex justify-content-between align-items-center">
+                    <h5>
+                        <i class="bi bi-table me-2"></i>
+                        Financial Summary Overview
+                    </h5>
+                    <span class="badge bg-secondary">USD ↔ UGX Analysis</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle analytics-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Metric</th>
+                                <th class="text-end">USD</th>
+                                <th class="text-end">UGX</th>
+                                <th class="text-end">UGX Equivalent</th>
+                                <th class="text-end">Contribution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Total Transactions -->
+                            <tr>
+                                <td>Total Transactions</td>
+                                <td class="text-end">{{ usd_count|intcomma }}</td>
+                                <td class="text-end">{{ ugx_count|intcomma }}</td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">
+                                    {% if total_transactions > 0 %}
+                                        {% widthratio usd_count total_transactions 100 as usd_txn_pct %}
+                                        {{ usd_txn_pct|floatformat:1 }}% USD
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <!-- Total Sent -->
+                            <tr class="fw-semibold">
+                                <td>Total Sent</td>
+                                <td class="text-end">
+                                    ${{ usd_total_amount|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {{ ugx_total_amount|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end text-success">
+                                    {{ total_amount_ugx|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {% if total_amount_ugx > 0 %}
+                                        {% widthratio usd_amount_ugx total_amount_ugx 100 as usd_amt_pct %}
+                                        {{ usd_amt_pct|floatformat:1 }}% USD
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <!-- Total Charges -->
+                            <tr>
+                                <td>Total Charges</td>
+                                <td class="text-end text-danger">
+                                    ${{ usd_total_charge|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end text-danger">
+                                    {{ ugx_total_charge|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end text-danger">
+                                    {{ total_charges_ugx|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {% if total_charges_ugx > 0 %}
+                                        {% widthratio usd_charge_ugx total_charges_ugx 100 as usd_charge_pct %}
+                                        {{ usd_charge_pct|floatformat:1 }}% USD
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <!-- Net Amount -->
+                            <tr class="fw-semibold">
+                                <td>Net Amount</td>
+                                <td class="text-end">
+                                    ${{ usd_total_net|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {{ ugx_total_net|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end text-primary">
+                                    {{ total_net|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {% if total_amount_ugx > 0 %}
+                                        {% widthratio total_net total_amount_ugx 100 as net_pct %}
+                                        {{ net_pct|floatformat:1 }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <!-- Average Transaction -->
+                            <tr>
+                                <td>Average Transaction Value</td>
+                                <td class="text-end">
+                                    ${{ usd_stats.avg_amount|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {{ ugx_stats.avg_amount|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">—</td>
+                            </tr>
+
+                            <!-- Average Charge -->
+                            <tr>
+                                <td>Average Charge</td>
+                                <td class="text-end">
+                                    ${{ usd_stats.avg_charge|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">
+                                    {{ ugx_stats.avg_charge|floatformat:0|intcomma }}
+                                </td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">—</td>
+                            </tr>
+
+                            <!-- Effective Charge Rate -->
+                            <tr class="table-warning">
+                                <td>Effective Charge Rate</td>
+                                <td class="text-end">
+                                    {% if usd_total_amount > 0 %}
+                                        {{ usd_charge_rate|floatformat:1 }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if ugx_total_amount > 0 %}
+                                        {{ ugx_charge_rate|floatformat:1 }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold">
+                                    {{ charge_rate|floatformat:1 }}%
+                                </td>
+                                <td class="text-end">—</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small text-muted mt-2">
+                    <i class="bi bi-info-circle me-1"></i>
+                    UGX Equivalent values use the current exchange rate (1 USD = {{ exchange_rate|floatformat:2 }} UGX)
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ===== CURRENCY-SPECIFIC BREAKDOWN ===== -->
+    <div class="row g-4 mb-4">
+        <!-- USD Transactions Breakdown -->
+        <div class="col-xl-6">
+            <div class="currency-card">
+                <div class="currency-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="currency-flag" style="background: #0052B4;">
+                            USD
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0">USD Transactions</h5>
+                            <small class="text-muted">{{ usd_count|default:0 }} transactions</small>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary">{{ usd_count|default:0 }} txns</span>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Total Sent (USD)</div>
+                            <div class="currency-metric-value">${{ usd_total_amount|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Total Charges (USD)</div>
+                            <div class="currency-metric-value">${{ usd_total_charge|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Value in UGX</div>
+                            <div class="currency-metric-value">{{ usd_amount_ugx|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Charges in UGX</div>
+                            <div class="currency-metric-value">{{ usd_charge_ugx|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if usd_stats.avg_amount %}
+                <div class="row g-3 mt-2">
+                    <div class="col-6">
+                        <div class="small text-muted">Avg. Transaction</div>
+                        <div class="fw-semibold">${{ usd_stats.avg_amount|default:0|floatformat:0|intcomma }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Avg. Charge</div>
+                        <div class="fw-semibold">${{ usd_stats.avg_charge|default:0|floatformat:0|intcomma }}</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if total_amount_ugx > 0 %}
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">USD Contribution to Total</small>
+                        <small class="fw-semibold">
+                            {% widthratio usd_amount_ugx total_amount_ugx 100 as usd_percentage %}
+                            {{ usd_percentage|floatformat:1 }}%
+                        </small>
+                    </div>
+                    <div class="progress-thin">
+                        <div class="progress-thin-bar" 
+                             style="width: {% widthratio usd_amount_ugx total_amount_ugx 100 %}%; background: #0052B4;"></div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- UGX Transactions Breakdown -->
+        <div class="col-xl-6">
+            <div class="currency-card">
+                <div class="currency-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="currency-flag" style="background: #FCDC04; color: #000;">
+                            UGX
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0">UGX Transactions</h5>
+                            <small class="text-muted">{{ ugx_count|default:0 }} transactions</small>
+                        </div>
+                    </div>
+                    <span class="badge bg-success">{{ ugx_count|default:0 }} txns</span>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Total Sent (UGX)</div>
+                            <div class="currency-metric-value">{{ ugx_total_amount|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Total Charges (UGX)</div>
+                            <div class="currency-metric-value">{{ ugx_total_charge|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">Net Amount</div>
+                            <div class="currency-metric-value">{{ ugx_total_net|default:0|floatformat:0|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="currency-metric">
+                            <div class="currency-metric-label">% of Total</div>
+                            <div class="currency-metric-value">
+                                {% if total_amount_ugx > 0 %}
+                                    {% widthratio ugx_total_amount total_amount_ugx 100 as ugx_percentage %}
+                                    {{ ugx_percentage|floatformat:1 }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if ugx_stats.avg_amount %}
+                <div class="row g-3 mt-2">
+                    <div class="col-6">
+                        <div class="small text-muted">Avg. Transaction</div>
+                        <div class="fw-semibold">{{ ugx_stats.avg_amount|default:0|floatformat:0|intcomma }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Avg. Charge</div>
+                        <div class="fw-semibold">{{ ugx_stats.avg_charge|default:0|floatformat:0|intcomma }}</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if total_amount_ugx > 0 %}
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">UGX Contribution to Total</small>
+                        <small class="fw-semibold">
+                            {% widthratio ugx_total_amount total_amount_ugx 100 as ugx_percentage %}
+                            {{ ugx_percentage|floatformat:1 }}%
+                        </small>
+                    </div>
+                    <div class="progress-thin">
+                        <div class="progress-thin-bar" 
+                             style="width: {% widthratio ugx_total_amount total_amount_ugx 100 %}%; background: #FCDC04;"></div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CHARTS SECTION ===== -->
+    <div class="row g-4 mb-5 charts-section">
+        <!-- Currency Volume Chart -->
+        <div class="col-lg-8">
+            <div class="chart-container-premium">
+                <div class="chart-header">
+                    <h5><i class="bi bi-bar-chart-line me-2"></i> Transaction Volume by Currency (UGX)</h5>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="currencyVolumeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charge Distribution Chart -->
+        <div class="col-lg-4">
+            <div class="chart-container-premium">
+                <div class="chart-header">
+                    <h5><i class="bi bi-pie-chart me-2"></i> Charge Distribution (UGX)</h5>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="chargeDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ADDITIONAL METRICS ===== -->
+    <div class="row g-4 mb-4">
+        <!-- Top Staff -->
+        {% if top_staff %}
+        <div class="col-xl-6">
+            <div class="chart-container-premium">
+                <div class="chart-header">
+                    <h5><i class="bi bi-trophy me-2"></i> Top Staff Performance</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Staff</th>
+                                <th>Transactions</th>
+                                <th>Total Amount (UGX)</th>
+                                <th>Total Charges (UGX)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for staff in top_staff %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                            {{ staff.confirmed_by__fullname|slice:":1"|upper|default:"S" }}
+                                        </div>
+                                        <span>{{ staff.confirmed_by__fullname|truncatechars:20|default:"System" }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ staff.transaction_count|intcomma }}</td>
+                                <td>{{ staff.total_amount|default:0|floatformat:0|intcomma }}</td>
+                                <td>{{ staff.total_charge|default:0|floatformat:0|intcomma }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Currency Distribution -->
+        {% if currency_stats %}
+        <div class="col-xl-6">
+            <div class="chart-container-premium">
+                <div class="chart-header">
+                    <h5><i class="bi bi-currency-exchange me-2"></i> Currency Distribution (UGX Equivalent)</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Currency</th>
+                                <th>Transactions</th>
+                                <th>Total Amount (Original)</th>
+                                <th>Total Amount (UGX)</th>
+                                <th>% of Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in currency_stats %}
+                            <tr>
+                                <td>
+                                    <span class="badge {% if stat.currency == 'USD' %}bg-primary{% else %}bg-success{% endif %}">
+                                        {{ stat.currency }}
+                                    </span>
+                                </td>
+                                <td>{{ stat.count|intcomma }}</td>
+                                <td>
+                                    {% if stat.currency == 'USD' %}
+                                        ${{ stat.total_amount|floatformat:0|intcomma }}
+                                    {% else %}
+                                        {{ stat.total_amount|floatformat:0|intcomma }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ stat.base_amount|floatformat:0|intcomma }}</td>
+                                <td>
+                                    <div class="progress" style="height: 20px; width: 100px;">
+                                        <div class="progress-bar {% if stat.currency == 'USD' %}bg-primary{% else %}bg-success{% endif %}" 
+                                             style="width: {{ stat.percentage|default:0 }}%;">
+                                            {{ stat.percentage|floatformat:1 }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted">Currency Diversity</small>
+                            <div class="fw-bold">{{ currency_count|default:0 }} currencies</div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Country Coverage</small>
+                            <div class="fw-bold">{{ country_count|default:0 }} countries</div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Active Staff</small>
+                            <div class="fw-bold">{{ staff_count|default:0 }} staff</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== SUMMARY STATS ===== -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3 col-6 border-end">
+                            <div class="py-3">
+                                <div class="small text-muted text-uppercase">Avg. Transaction Value (UGX)</div>
+                                <div class="h4 fw-bold text-primary">{{ avg_amount|default:0|floatformat:0|intcomma }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 border-end">
+                            <div class="py-3">
+                                <div class="small text-muted text-uppercase">Avg. Charge Amount (UGX)</div>
+                                <div class="h4 fw-bold text-success">{{ avg_charge|default:0|floatformat:0|intcomma }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6 border-end">
+                            <div class="py-3">
+                                <div class="small text-muted text-uppercase">Overall Charge Rate</div>
+                                <div class="h4 fw-bold text-warning">
+                                    {{ charge_rate|floatformat:1 }}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="py-3">
+                                <div class="small text-muted text-uppercase">Most Active Currency</div>
+                                <div class="h4 fw-bold text-danger">
+                                    {% if top_currencies %}
+                                        {% for currency in top_currencies|slice:":1" %}
+                                            {{ currency.currency }}
+                                            <small class="text-muted d-block">({{ currency.count }} txns)</small>
+                                        {% endfor %}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== CHART.JS ===== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Charts
+    initCurrencyVolumeChart();
+    initChargeDistributionChart();
+    
+    // Initialize animations
+    initAnimations();
+});
+
+function initCurrencyVolumeChart() {
+    const ctx = document.getElementById('currencyVolumeChart');
+    if (!ctx) return;
+    
+    // Prepare data
+    const currencyLabels = [];
+    const amountData = [];
+    const chargeData = [];
+    
+    // Add USD data - using UGX equivalent
+    if ({{ usd_count|default:0 }} > 0) {
+        currencyLabels.push('USD');
+        amountData.push({{ usd_amount_ugx|default:0 }});
+        chargeData.push({{ usd_charge_ugx|default:0 }});
+    }
+    
+    // Add UGX data
+    if ({{ ugx_count|default:0 }} > 0) {
+        currencyLabels.push('UGX');
+        amountData.push({{ ugx_total_amount|default:0 }});
+        chargeData.push({{ ugx_total_charge|default:0 }});
+    }
+    
+    // Add other currencies if available from currency_stats
+    {% for stat in currency_stats %}
+        {% if stat.currency != 'USD' and stat.currency != 'UGX' %}
+        currencyLabels.push('{{ stat.currency }}');
+        amountData.push({{ stat.base_amount|default:0 }});
+        chargeData.push({{ stat.base_charge|default:0 }});
+        {% endif %}
+    {% endfor %}
+    
+    // Check if we have data
+    if (currencyLabels.length === 0) {
+        ctx.parentElement.innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-bar-chart-line text-muted fs-1 mb-3 d-block"></i>
+                <p class="text-muted">No transaction data available</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Create chart
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: currencyLabels,
+            datasets: [
+                {
+                    label: 'Total Amount (UGX)',
+                    data: amountData,
+                    backgroundColor: 'rgba(30, 127, 127, 0.8)',
+                    borderColor: '#1E7F7F',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                },
+                {
+                    label: 'Total Charges (UGX)',
+                    data: chargeData,
+                    backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                    borderColor: '#dc3545',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const value = context.parsed.y;
+                            return label + value.toLocaleString() + ' UGX';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString() + ' UGX';
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Amount in UGX'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Currency'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initChargeDistributionChart() {
+    const ctx = document.getElementById('chargeDistributionChart');
+    if (!ctx) return;
+    
+    // Prepare data - use UGX equivalent charges
+    const labels = ['USD Charges', 'UGX Charges'];
+    const data = [{{ usd_charge_ugx|default:0 }}, {{ ugx_total_charge|default:0 }}];
+    const backgroundColor = ['#0052B4', '#FCDC04'];
+    const borderColor = ['#0052B4', '#FCDC04'];
+    
+    // Check if we have data
+    const totalCharges = data.reduce((a, b) => a + b, 0);
+    if (totalCharges === 0) {
+        ctx.parentElement.innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-pie-chart text-muted fs-1 mb-3 d-block"></i>
+                <p class="text-muted">No charge data available</p>
+            </div>
+        `;
+        return;
+    }
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColor,
+                borderColor: borderColor,
+                borderWidth: 2,
+                hoverOffset: 15
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true,
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const percentage = Math.round((value / totalCharges) * 100);
+                            return `${label}: ${value.toLocaleString()} UGX (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initAnimations() {
+    // Animate numbers
+    function animateNumbers() {
+        const elements = document.querySelectorAll('.analytics-value-premium, .value-lg, .h4.fw-bold');
+        elements.forEach(element => {
+            const text = element.textContent;
+            const match = text.match(/[\d,]+\.?\d*/);
+            
+            if (match) {
+                const cleanText = match[0].replace(/,/g, '');
+                const finalValue = parseFloat(cleanText) || 0;
+                
+                if (finalValue > 0) {
+                    let startValue = 0;
+                    const duration = 1000;
+                    const startTime = Date.now();
+                    
+                    function updateNumber() {
+                        const currentTime = Date.now();
+                        const elapsed = currentTime - startTime;
+                        const progress = Math.min(elapsed / duration, 1);
+                        
+                        const easeOutQuad = t => t * (2 - t);
+                        const currentValue = Math.floor(easeOutQuad(progress) * finalValue);
+                        
+                        element.textContent = currentValue.toLocaleString();
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(updateNumber);
+                        }
+                    }
+                    
+                    updateNumber();
+                }
+            }
+        });
+    }
+    
+    // Start animations after a delay
+    setTimeout(animateNumbers, 300);
+    
+    // Add hover effects
+    document.querySelectorAll('.currency-card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-4px)';
+            this.style.boxShadow = '0 10px 20px rgba(0,0,0,0.1)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '';
+        });
+    });
+    
+    // Update progress bars
+    document.querySelectorAll('.progress-thin-bar').forEach(bar => {
+        const width = bar.style.width;
+        bar.style.width = '0%';
+        setTimeout(() => {
+            bar.style.width = width;
+            bar.style.transition = 'width 1.5s ease-in-out';
+        }, 500);
+    });
+}
+</script>
+{% endblock %}

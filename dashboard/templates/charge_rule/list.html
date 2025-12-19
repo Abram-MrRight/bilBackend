@@ -1,0 +1,46 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Charge Rules</h2>
+    <a href="{% url 'add_charge_rule' %}" class="btn btn-primary">Add Charge Rule</a>
+</div>
+
+<table class="table table-striped table-hover">
+    <thead class="table-success">
+        <tr>
+            <th>Country</th>
+            <th>Currency</th>
+            <th>Min Amount</th>
+            <th>Max Amount</th>
+            <th>Charge Amount</th>
+            <th>Updated By</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for rule in rules %}
+        <tr>
+            <td>{{ rule.country.name }}</td>
+            <td>{{ rule.currency.code }}</td>
+            <td>{{ rule.min_amount }}</td>
+            <td>{{ rule.max_amount }}</td>
+            <td>{{ rule.charge_amount }}</td>
+            <td>
+                {% if rule.updated_by %}
+                    {{ rule.updated_by.fullname }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>
+                <a href="{% url 'edit_charge_rule' rule.pk %}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{% url 'delete_charge_rule' rule.pk %}" class="btn btn-sm btn-danger"
+                   onclick="return confirm('Are you sure you want to delete this charge rule?');">Delete</a>
+            </td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="8" class="text-center">No charge rules found.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

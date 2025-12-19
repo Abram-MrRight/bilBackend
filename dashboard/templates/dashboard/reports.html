@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<h4 class="mb-3">Proof Reports</h4>
+<table class="table table-bordered">
+  <thead class="table-dark">
+    <tr><th>Status</th><th>Total</th></tr>
+  </thead>
+  <tbody>
+    {% for r in reports %}
+    <tr><td>{{ r.status|title }}</td><td>{{ r.total }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

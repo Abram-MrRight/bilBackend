@@ -1,0 +1,44 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+
+<div class="container mt-4">
+  <h4>Exchange Rates</h4>
+  <a href="{% url 'exchange_rate_add' %}" class="btn btn-primary btn-sm mb-3">Add Rate</a>
+
+  <table class="table table-bordered table-hover table-sm">
+    <thead class="table-success">
+      <tr>
+        <th>Currency</th>
+        <th>Rate (1 {{ rate.currency }} → UGX)</th>
+        <th>Reverse (1 UGX → currency)</th>
+        <th>Updated At</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rate in rates %}
+      <tr>
+        <td>{{ rate.currency }}</td>
+        <td>{{ rate.rate_to_ugx|floatformat:2 }}</td>
+        <td>
+          {% if rate.reverse_fx %}
+            1 UGX = {{ rate.reverse_fx|floatformat:6 }} {{ rate.currency }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ rate.updated_at|date:"Y-m-d H:i" }}</td>
+        <td>
+          <a href="{% url 'exchange_rate_edit' rate.id %}" class="btn btn-warning btn-sm">Edit</a>
+          <a href="{% url 'exchange_rate_delete' rate.id %}" class="btn btn-danger btn-sm"
+             onclick="return confirm('Delete this rate?');">Delete</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-center">No rates found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

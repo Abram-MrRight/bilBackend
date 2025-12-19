@@ -1,0 +1,14 @@
+:root {
+    --teal: #20c997;
+    --teal-dark: #17a2b8;
+}
+.btn-teal {
+    background-color: var(--teal);
+    color: #fff;
+    border: none;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+.btn-teal:hover { background-color: var(--teal-dark); transform: translateY(-2px); }
+.text-teal { color: var(--teal); }
+.form-control { border-radius: 0.5rem; border: 1px solid #ced4da; padding: 0.3rem 0.6rem; transition: border-color 0.3s ease, box-shadow 0.2s ease; }
+.form-control:focus { border-color: var(--teal); box-shadow: 0 0 5px rgba(32,201,151,0.4); }

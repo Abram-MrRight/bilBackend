@@ -1,0 +1,281 @@
+{% extends 'dashboard/base.html' %}
+{% load humanize %}
+{% load static %}
+{% block content %}
+
+<!-- CSS -->
+<link rel="stylesheet" href="{% static 'dashboard/css/proofs.css' %}">
+
+<div class="proofs-container">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="fw-bold mb-1">Proofs Management</h4>
+                <p class="mb-0 opacity-90">View all money transfer proofs</p>
+            </div>
+            <span class="badge bg-light text-dark">
+                <i class="bi bi-clock me-1"></i> {% now "H:i" %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-box">
+            <div class="stat-number">{{ total_proofs|default:"0"|intcomma }}</div>
+            <div class="stat-label">Total Proofs</div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-number">{{ pending_count|default:"0"|intcomma }}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-number">{{ received_count|default:"0"|intcomma }}</div>
+            <div class="stat-label">Received</div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-number">{{ delivered_count|default:"0"|intcomma }}</div>
+            <div class="stat-label">Delivered</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-box">
+        <div class="filter-controls">
+            <input type="text" 
+                   id="proof-search" 
+                   class="filter-input" 
+                   placeholder="Search by sender, receiver, or amount..."
+                   value="{{ request.GET.q|default:'' }}">
+            
+            <select id="proof-status-filter" class="filter-input">
+                <option value="">All Statuses</option>
+                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="money_received" {% if request.GET.status == 'money_received' %}selected{% endif %}>Received</option>
+                <option value="money_delivered" {% if request.GET.status == 'money_delivered' %}selected{% endif %}>Delivered</option>
+            </select>
+            
+            <button type="button" id="resetBtn" class="filter-btn">
+                <i class="bi bi-arrow-clockwise me-1"></i> Reset
+            </button>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <h6 class="mb-0">
+                <i class="bi bi-file-earmark-text me-2"></i>
+                All Proofs ({{ page_obj.paginator.count|default:proofs.count }})
+            </h6>
+        </div>
+        
+        <div class="table-responsive" id="proofsContainer">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Image</th>
+                        <th>Sender</th>
+                        <th>Receiver</th>
+                        <th>Amount</th>
+                        <th>Currency</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="proofs-table-body">
+                    {% for p in proofs %}
+                    <tr>
+                        <td class="fw-bold">#{{ p.id }}</td>
+                        <td>
+                            <div class="small">{{ p.created_at|date:"M d" }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ p.created_at|time:"H:i" }}</div>
+                        </td>
+                        <td>
+                            {% if p.image %}
+                            <a href="{{ p.image.url }}" target="_blank">
+                                <img src="{{ p.image.url }}" class="proof-image" alt="Proof">
+                            </a>
+                            {% else %}
+                            <span class="text-muted small">No Image</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.sender_name|default:p.user|truncatechars:12 }}</td>
+                        <td>{{ p.receiver_name|default:"-"|truncatechars:12 }}</td>
+                        <td class="fw-bold">{{ p.amount|intcomma }}</td>
+                        <td><span class="badge bg-light text-dark">{{ p.currency }}</span></td>
+                        <td>
+                            {% if p.status == 'pending' %}
+                            <span class="status-badge badge-pending">Pending</span>
+                            {% elif p.status == 'money_received' %}
+                            <span class="status-badge badge-received">Received</span>
+                            {% elif p.status == 'money_delivered' %}
+                            <span class="status-badge badge-delivered">Delivered</span>
+                            {% else %}
+                            <span class="status-badge">{{ p.status|title }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <i class="bi bi-file-earmark-text fs-3 text-muted d-block mb-2"></i>
+                            <div class="text-muted">No proofs found</div>
+                            <small class="text-muted">Try adjusting your filters</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="pagination-container">
+            <nav>
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" 
+                           href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
+                            ‹ Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                        <li class="page-item">
+                            <a class="page-link" 
+                               href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
+                                {{ num }}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" 
+                           href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
+                            Next ›
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let filterTimeout;
+    const searchInput = document.getElementById('proof-search');
+    const statusFilter = document.getElementById('proof-status-filter');
+    const resetBtn = document.getElementById('resetBtn');
+    
+    // Real-time filtering
+    function applyFilters() {
+        const query = searchInput.value.trim();
+        const status = statusFilter.value;
+        
+        const params = new URLSearchParams();
+        if (query) params.append('q', query);
+        if (status) params.append('status', status);
+        
+        // Show loading
+        const tbody = document.getElementById('proofs-table-body');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4">
+                    <div class="spinner"></div>
+                    <div class="text-muted mt-2">Loading proofs...</div>
+                </td>
+            </tr>
+        `;
+        
+        // Fetch results
+        fetch(`?${params.toString()}`, {
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
+        .then(response => response.text())
+        .then(html => {
+            // Parse and update only the table body
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTbody = doc.getElementById('proofs-table-body');
+            const newPagination = doc.querySelector('.pagination-container');
+            
+            if (newTbody) {
+                tbody.innerHTML = newTbody.innerHTML;
+            }
+            
+            // Update pagination if it exists
+            const paginationContainer = document.querySelector('.pagination-container');
+            if (newPagination && paginationContainer) {
+                paginationContainer.innerHTML = newPagination.innerHTML;
+            }
+            
+            // Update URL
+            window.history.replaceState({}, '', `?${params.toString()}`);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle d-block mb-2"></i>
+                        Error loading proofs
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    // Search input with debounce
+    searchInput.addEventListener('input', function() {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(applyFilters, 500);
+    });
+    
+    // Status filter
+    statusFilter.addEventListener('change', applyFilters);
+    
+    // Reset button
+    resetBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        statusFilter.value = '';
+        applyFilters();
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + F focuses search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            searchInput.focus();
+        }
+        
+        // Escape clears filters
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            statusFilter.value = '';
+            applyFilters();
+        }
+    });
+});
+</script>
+{% endblock %}

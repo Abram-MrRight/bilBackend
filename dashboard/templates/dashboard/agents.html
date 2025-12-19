@@ -1,0 +1,29 @@
+{% extends 'dashboard/base.html' %}
+{% block page_title %}Agents{% endblock %}
+{% block content %}
+<h4>Agents</h4>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Agent Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Company</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in agents %}
+        <tr>
+            <td>{{ a.id }}</td>
+            <td>{{ a.fullname }}</td>
+            <td>{{ a.email }}</td>
+            <td>{{ a.phone }}</td>
+            <td>{{ a.company.name }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center">No agents available</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

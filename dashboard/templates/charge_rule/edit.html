@@ -1,0 +1,30 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<h2>Edit Charge Rule</h2>
+<form method="POST">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-success">Update</button>
+    <a href="{% url 'charge_rule_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const countryInput = document.getElementById("id_country");
+    const currencyInput = document.getElementById("id_currency");
+
+    countryInput.addEventListener("change", function () {
+        const countryId = this.value;
+
+        fetch(`/dashboard/get-currencies/${countryId}/`)
+            .then(response => response.json())
+            .then(data => {
+                currencyInput.innerHTML = '<option value="">Select Currency</option>';
+                data.forEach(function(currency) {
+                    currencyInput.innerHTML += `<option value="${currency.id}">${currency.name}</option>`;
+                });
+            });
+    });
+});
+</script>

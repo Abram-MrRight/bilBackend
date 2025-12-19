@@ -1,0 +1,815 @@
+{% extends 'dashboard/base.html' %}
+{% load humanize %}
+{% block page_title %}{{ title }}{% endblock %}
+{% load static %}
+
+{% block content %}
+ <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'dashboard/css/users.css' %}">
+
+
+<div class="container-fluid users-container">
+    
+    <!-- ===== EXECUTIVE HEADER ===== -->
+    <div class="executive-users-header">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="fw-bold mb-2">Users Management</h1>
+                <p class="lead opacity-85 mb-0">Manage system users, roles, and permissions</p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <button class="btn btn-success btn-lg shadow-sm" id="addUserBtn">
+                    <i class="bi bi-person-plus me-2"></i> Add New User
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SEARCH & FILTERS ===== -->
+    <div class="search-filter-container mb-4">
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="position-relative">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" 
+                           id="user-search" 
+                           class="form-control search-input" 
+                           placeholder="Search users by name, email, or ID..."
+                           oninput="searchUsers()">
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="d-flex flex-wrap gap-2">
+                    <div class="filter-badge active" data-filter="all" onclick="filterUsers('all')">
+                        All Users
+                    </div>
+                    <div class="filter-badge" data-filter="admin" onclick="filterUsers('admin')">
+                        <i class="bi bi-shield-check me-1"></i> Admins
+                    </div>
+                    <div class="filter-badge" data-filter="client" onclick="filterUsers('client')">
+                        <i class="bi bi-people me-1"></i> Clients
+                    </div>
+                    <div class="filter-badge" data-filter="active" onclick="filterUsers('active')">
+                        <i class="bi bi-circle-fill status-active me-1"></i> Active
+                    </div>
+                    <div class="filter-badge" data-filter="recent" onclick="filterUsers('recent')">
+                        <i class="bi bi-clock me-1"></i> Recent
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Success/Error Alert Container -->
+    <div id="alert-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;"></div>
+    <!-- ===== USERS TABLE ===== -->
+    <div class="premium-users-table">
+        <div class="table-header-premium">
+            <h5><i class="bi bi-people"></i> All Users ({{ users|length }})</h5>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead table-success>
+                    <tr class="text-muted">
+                        <th>User</th>
+                        <th>Contact</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    {% for u in users %}
+                    <tr data-role="{{ u.role }}" data-active="{{ u.is_active }}">
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="user-avatar me-3">
+                                    {{ u.fullname|default:u.username|first|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold">{{ u.fullname|default:u.username }}</div>
+                                    <small class="text-muted">@{{ u.username|default:u.email|truncatechars:15 }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="small">{{ u.email }}</div>
+                            {% if u.phone_number %}
+                            <div class="small text-muted">{{ u.phone_number }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="role-badge badge-{{ u.role }}">
+                                <i class="bi bi-{% if u.role == 'admin' %}shield-check{% elif u.role == 'client' %}person{% else %}gear{% endif %} me-1"></i>
+                                {{ u.role|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="d-flex align-items-center">
+                                <span class="status-indicator status-{% if u.is_active %}active{% else %}inactive{% endif %}"></span>
+                                <span>{% if u.is_active %}Active{% else %}Inactive{% endif %}</span>
+                            </span>
+                        </td>
+                        <td>
+                            <div class="small">{{ u.date_joined|date:"M d, Y" }}</div>
+                            <div class="small text-muted">{{ u.date_joined|timesince }} ago</div>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                               <button class="btn-action btn-edit" onclick="openEditUserModal({{ u.id }})" 
+                                        data-bs-toggle="tooltip" title="Edit User">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn-action btn-delete" onclick="confirmDelete({{ u.id }}, '{{ u.fullname|default:u.username }}')"
+                                        data-bs-toggle="tooltip" title="Delete User">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">
+                                    <i class="bi bi-people"></i>
+                                </div>
+                                <h5 class="text-muted mb-2">No Users Found</h5>
+                                <p class="text-muted">Add your first user to get started</p>
+                               <div class="col-lg-4 text-lg-end">
+                                    <a href="{% url 'add_user' %}"
+                                    class="btn btn-success btn-lg shadow-sm d-inline-block">
+                                        Add New User
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+   {% if users.has_other_pages %}
+    <nav aria-label="Users pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if users.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ users.previous_page_number }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">&laquo;</span>
+            </li>
+            {% endif %}
+
+            {% for i in users.paginator.page_range %}
+                {% if users.number == i %}
+                <li class="page-item active">
+                    <span class="page-link">{{ i }}</span>
+                </li>
+                {% elif i >= users.number|add:'-2' and i <= users.number|add:'2' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                </li>
+                {% elif i == 1 or i == users.paginator.num_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                </li>
+                {% elif i == users.number|add:'-3' or i == users.number|add:'3' %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if users.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ users.next_page_number }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">&raquo;</span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}
+
+</div>
+
+
+
+<!-- ===== ADD USER MODAL ===== -->
+<div id="addUserModal" class="modal-premium" style="display: none;">
+    <div class="modal-backdrop" onclick="closeAddUserModal()"></div>
+    <div class="modal-content-premium">
+        <div class="modal-header-premium">
+            <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i> Add New User</h5>
+            <button type="button" class="btn-close btn-close-white" onclick="closeAddUserModal()"></button>
+        </div>
+        <div class="modal-body-premium">
+            <form method="post" action="{% url 'add_user' %}" id="add-user-form" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="row g-3">
+                    {% for field in form %}
+                    <div class="col-12">
+                        <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                            {{ field.label }}
+                            {% if field.field.required %}
+                            <span class="text-danger">*</span>
+                            {% endif %}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn btn-outline-secondary" onclick="closeAddUserModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submitUserBtn">
+                        <i class="bi bi-check-circle me-2"></i> Create User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== EDIT USER MODAL ===== -->
+<div id="editUserModal" class="modal-premium" style="display: none;">
+    <div class="modal-backdrop" onclick="closeEditUserModal()"></div>
+    <div class="modal-content-premium">
+        <div class="modal-header-premium">
+            <h5 class="mb-0"><i class="bi bi-pencil me-2"></i> Edit User</h5>
+            <button type="button" class="btn-close btn-close-white" onclick="closeEditUserModal()"></button>
+        </div>
+        <div class="modal-body-premium" id="editUserFormContainer">
+            <!-- Form will be loaded here via AJAX -->
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ===== DELETE CONFIRMATION MODAL ===== -->
+<div id="deleteConfirmModal" class="modal-premium" style="display: none;">
+    <div class="modal-backdrop" onclick="closeDeleteModal()"></div>
+    <div class="modal-content-premium">
+        <div class="modal-header-premium" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i> Confirm Delete</h5>
+            <button type="button" class="btn-close btn-close-white" onclick="closeDeleteModal()"></button>
+        </div>
+        <div class="modal-body-premium text-center">
+            <div class="mb-4">
+                <i class="bi bi-person-x fs-1 text-danger mb-3 d-block"></i>
+                <h5 class="fw-bold">Delete User?</h5>
+                <p class="text-muted">Are you sure you want to delete this user? This action cannot be undone.</p>
+                <div class="bg-light rounded p-3 mb-3">
+                    <div id="deleteUserInfo"></div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-center gap-3">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeDeleteModal()">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="bi bi-trash me-2"></i> Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Fixed: Add button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to all add user buttons
+    document.getElementById('addUserBtn')?.addEventListener('click', openAddUserModal);
+    document.getElementById('addUserBtn2')?.addEventListener('click', openAddUserModal);
+    
+    // Initialize Bootstrap tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    document.querySelectorAll('.modal-content-premium').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+        e.stopPropagation(); // prevents closing when clicking inside modal
+    });
+});
+
+    // Style form elements
+    document.querySelectorAll('#add-user-form input, #add-user-form select, #add-user-form textarea').forEach(input => {
+        if (!input.classList.contains('form-control') && !input.classList.contains('form-select')) {
+            input.classList.add('form-control');
+        }
+    });
+    
+    // Initialize filter badges
+    document.querySelector('.filter-badge[data-filter="all"]').classList.add('active');
+});
+
+// Modal Functions
+function openAddUserModal() {
+    const modal = document.getElementById('addUserModal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // prevent background scroll
+}
+
+function closeAddUserModal() {
+    const modal = document.getElementById('addUserModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// SIMPLE FIXED DELETE FUNCTION
+function confirmDelete(userId, userName) {
+    // Show info in modal
+    document.getElementById('deleteUserInfo').innerHTML = `
+        <div class="text-center">
+            <i class="bi bi-exclamation-triangle text-warning fs-1 mb-3 d-block"></i>
+            <strong class="d-block fs-5">${userName}</strong>
+            <small class="text-muted">ID: #${userId}</small>
+        </div>
+    `;
+    
+    // Show modal
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Get the delete button and reset it
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+    deleteBtn.innerHTML = '<i class="bi bi-trash me-2"></i> Delete User';
+    deleteBtn.disabled = false;
+    
+    // Remove any existing onclick handlers
+    deleteBtn.onclick = null;
+    
+    // Add new onclick handler
+    deleteBtn.onclick = async function() {
+        const btn = this;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Deleting...';
+        btn.disabled = true;
+        
+        try {
+            // Get CSRF token
+            const csrfToken = getCsrfToken();
+            
+            if (!csrfToken) {
+                throw new Error('CSRF token not found. Please refresh the page.');
+            }
+            
+            // Send AJAX request
+            const response = await fetch(`/users/delete/${userId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            // Check if response is OK
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Parse JSON response
+            const data = await response.json();
+            
+            if (data.success) {
+                // Find and remove the table row
+                const rows = document.querySelectorAll('#users-table-body tr');
+                rows.forEach(row => {
+                    const rowIdCell = row.querySelector('td.fw-bold');
+                    if (rowIdCell) {
+                        const rowId = parseInt(rowIdCell.textContent.replace('#', '').trim());
+                        if (rowId === userId) {
+                            // Add fade out animation
+                            row.style.transition = 'opacity 0.3s';
+                            row.style.opacity = '0';
+                            setTimeout(() => row.remove(), 300);
+                        }
+                    }
+                });
+                
+                // Close modal after a delay
+                setTimeout(() => {
+                    document.getElementById('deleteConfirmModal').style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }, 500);
+                
+                // Show success message
+                showAlert(data.message || 'User deleted successfully!', 'success');
+                
+                // Update user count
+                updateUserCount();
+                
+            } else {
+                throw new Error(data.message || 'Failed to delete user');
+            }
+            
+        } catch (error) {
+            console.error('Delete error:', error);
+            showAlert('Error: ' + error.message, 'danger');
+            
+            // Reset button
+            btn.innerHTML = '<i class="bi bi-trash me-2"></i> Delete User';
+            btn.disabled = false;
+        }
+    };
+}
+
+
+// IMPROVED CSRF Token function
+function getCsrfToken() {
+    let token = null;
+    
+    // 1. Try from meta tag
+    const metaToken = document.querySelector('meta[name="csrf-token"]');
+    if (metaToken) {
+        token = metaToken.getAttribute('content');
+        if (token) return token;
+    }
+    
+    // 2. Try from form input
+    const formToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (formToken) {
+        token = formToken.value;
+        if (token) return token;
+    }
+    
+    // 3. Try from all forms
+    const allTokens = document.querySelectorAll('input[name="csrfmiddlewaretoken"]');
+    if (allTokens.length > 0) {
+        token = allTokens[0].value;
+        if (token) return token;
+    }
+    
+    // 4. Try from cookies
+    const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrftoken='))
+        ?.split('=')[1];
+    
+    if (cookieValue) {
+        return cookieValue;
+    }
+    
+    console.error('CSRF token not found! Check your template for csrf_token.');
+    return null;
+}
+
+// Close delete modal
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+    document.body.style.paddingRight = '';
+}
+
+// Alert function
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alert-container') || createAlertContainer();
+    
+    const alertId = 'alert-' + Date.now();
+    const alert = document.createElement('div');
+    alert.id = alertId;
+    alert.className = `alert alert-${type} alert-dismissible fade show shadow-lg`;
+    alert.style.animation = 'slideIn 0.3s ease-out';
+    alert.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi bi-${getAlertIcon(type)} me-2"></i>
+            <span>${message}</span>
+            <button type="button" class="btn-close ms-auto" onclick="document.getElementById('${alertId}').remove()"></button>
+        </div>
+    `;
+    
+    alertContainer.appendChild(alert);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            alertElement.style.opacity = '0';
+            alertElement.style.transition = 'opacity 0.3s';
+            setTimeout(() => alertElement.remove(), 300);
+        }
+    }, 5000);
+}
+
+function getAlertIcon(type) {
+    switch(type) {
+        case 'success': return 'check-circle';
+        case 'danger': return 'exclamation-triangle';
+        case 'warning': return 'exclamation-circle';
+        default: return 'info-circle';
+    }
+}
+
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.id = 'alert-container';
+    container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Update user count
+function updateUserCount() {
+    setTimeout(() => {
+        const userRows = document.querySelectorAll('#users-table-body tr').length;
+        const countElement = document.querySelector('.table-header-premium h5');
+        if (countElement) {
+            countElement.innerHTML = `<i class="bi bi-people"></i> All Users (${userRows})`;
+        }
+    }, 350);
+}
+
+// Show empty state function
+function showEmptyState() {
+    const tableBody = document.getElementById('users-table-body');
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="7">
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <h5 class="text-muted mb-2">No Users Found</h5>
+                    <p class="text-muted">Add your first user to get started</p>
+                    <button class="btn btn-success" onclick="openAddUserModal()">
+                        <i class="bi bi-person-plus me-2"></i> Add New User
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+function openEditUserModal(userId) {
+    const modal = document.getElementById('editUserModal');
+    const formContainer = document.getElementById('editUserFormContainer');
+
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    // Show loading spinner
+    formContainer.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    `;
+
+    // Fetch the form via AJAX
+    fetch(`/users/edit/${userId}/?modal=1`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(res => res.text())
+    .then(html => {
+        formContainer.innerHTML = html;
+
+        // Add event listener to submit the form via AJAX
+        const form = formContainer.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitEditUserForm(form, modal);
+            });
+        }
+    })
+    .catch(err => {
+        formContainer.innerHTML = `<p class="text-danger">Failed to load form.</p>`;
+        console.error(err);
+    });
+}
+
+function closeEditUserModal() {
+    const modal = document.getElementById('editUserModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+function submitEditUserForm(form, modal) {
+    const formData = new FormData(form);
+    const userId = form.action.match(/(\d+)\/$/)[1];
+
+    const csrfToken = getCsrfToken();
+    
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            modal.style.display = 'none';
+            // Optionally refresh the row or table
+            setTimeout(() => location.reload(), 500); 
+        } else {
+            // Display form errors
+            document.getElementById('editUserFormContainer').innerHTML = data.html;
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showAlert('Error updating user.', 'danger');
+    });
+}
+
+// Update user count
+function updateUserCount() {
+    const userRows = document.querySelectorAll('#users-table-body tr:not(.empty-row)');
+    const countElement = document.querySelector('.table-header-premium h5');
+    if (countElement) {
+        countElement.innerHTML = `<i class="bi bi-people"></i> All Users (${userRows.length})`;
+    }
+}
+
+// Close delete modal function
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+    
+    // Reset delete button
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmBtn) {
+        confirmBtn.innerHTML = '<i class="bi bi-trash me-2"></i> Delete User';
+        confirmBtn.disabled = false;
+    }
+}
+
+
+// Alert function
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alert-container') || createAlertContainer();
+    
+    const alertId = 'alert-' + Date.now();
+    const alert = document.createElement('div');
+    alert.id = alertId;
+    alert.className = `alert alert-${type} alert-dismissible fade show shadow-lg`;
+    alert.style.animation = 'slideIn 0.3s ease-out';
+    alert.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+            <span>${message}</span>
+            <button type="button" class="btn-close ms-auto" onclick="document.getElementById('${alertId}').remove()"></button>
+        </div>
+    `;
+    
+    alertContainer.appendChild(alert);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            alertElement.style.opacity = '0';
+            alertElement.style.transition = 'opacity 0.3s';
+            setTimeout(() => alertElement.remove(), 300);
+        }
+    }, 5000);
+}
+
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.id = 'alert-container';
+    container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Update user count after deletion
+function updateUserCount() {
+    const tableBody = document.getElementById('users-table-body');
+    const userCount = tableBody.querySelectorAll('tr:not(.empty-row)').length;
+    const countElement = document.querySelector('.table-header-premium h5');
+    if (countElement) {
+        countElement.innerHTML = `<i class="bi bi-people"></i> All Users (${userCount})`;
+    }
+}
+
+// Also update your delete URL in the viewUser function
+function viewUser(userId) {
+    window.location.href = `/users/${userId}/`;
+}
+
+
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    document.body.style.paddingRight = '';
+}
+
+// Search and Filter Functions
+let searchTimeout;
+
+function searchUsers() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const query = document.getElementById('user-search').value.toLowerCase();
+        const tableRows = document.querySelectorAll('#users-table-body tr[data-role]');
+        const activeFilter = document.querySelector('.filter-badge.active')?.dataset.filter || 'all';
+        
+        tableRows.forEach(row => {
+            const name = row.querySelector('.fw-bold')?.textContent.toLowerCase() || '';
+            const email = row.querySelector('.small')?.textContent.toLowerCase() || '';
+            const role = row.dataset.role;
+            const isActive = row.dataset.active === 'True';
+            
+            // Apply search filter
+            const matchesSearch = !query || 
+                name.includes(query) || 
+                email.includes(query) ||
+                row.querySelector('.text-muted')?.textContent.toLowerCase().includes(query);
+            
+            // Apply role/status filter
+            let matchesFilter = true;
+            if (activeFilter !== 'all') {
+                if (activeFilter === 'admin' || activeFilter === 'client' || activeFilter === 'staff') {
+                    matchesFilter = role === activeFilter;
+                } else if (activeFilter === 'active') {
+                    matchesFilter = isActive;
+                } else if (activeFilter === 'recent') {
+                    // You can implement recent filter logic here
+                    matchesFilter = true; // Placeholder
+                }
+            }
+            
+            row.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
+        });
+    }, 300);
+}
+
+function filterUsers(filter) {
+    // Remove active class from all filter badges
+    document.querySelectorAll('.filter-badge').forEach(badge => {
+        badge.classList.remove('active');
+    });
+    
+    // Add active class to clicked filter
+    document.querySelector(`.filter-badge[data-filter="${filter}"]`).classList.add('active');
+    
+    // Trigger search to apply filter
+    searchUsers();
+}
+
+function viewUser(userId) {
+    // Implement user view modal or page
+    window.location.href = `/users/view/${userId}/`;
+}
+
+// Handle form submission with loading state
+document.getElementById('add-user-form')?.addEventListener('submit', function(e) {
+    const submitBtn = document.getElementById('submitUserBtn');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i> Creating...';
+        submitBtn.disabled = true;
+    }
+});
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Escape key closes modals
+    if (e.key === 'Escape') {
+        if (document.getElementById('addUserModal').style.display === 'flex') {
+            closeAddUserModal();
+        }
+        if (document.getElementById('deleteConfirmModal').style.display === 'flex') {
+            closeDeleteModal();
+        }
+    }
+    
+    // Ctrl/Cmd + N opens add user modal
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        openAddUserModal();
+    }
+});
+</script>
+{% endblock %}

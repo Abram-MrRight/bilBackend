@@ -1,0 +1,43 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-sm border-0 p-4">
+    <div class="text-center mb-3">
+      <h4 class="fw-bold text-primary">BilChat Transaction Receipt</h4>
+      <p class="text-muted mb-0">Reference: {{ transaction.transaction_reference }}</p>
+      <p class="small">Date: {{ transaction.confirmed_at|date:"Y-m-d H:i" }}</p>
+    </div>
+
+    <hr>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <h6 class="text-muted">Sender:</h6>
+        <p class="fw-semibold">{{ transaction.sender_name }}</p>
+      </div>
+      <div class="col-md-6">
+        <h6 class="text-muted">Receiver:</h6>
+        <p class="fw-semibold">{{ transaction.receiver_name }}</p>
+        <p class="text-muted small">{{ transaction.receiver_contact }}</p>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <h6 class="text-muted">Amount:</h6>
+        <p class="fw-bold">{{ transaction.amount }} {{ transaction.currency }}</p>
+      </div>
+      <div class="col-md-6">
+        <h6 class="text-muted">Confirmed By:</h6>
+        <p>{{ transaction.confirmed_by.username|default:"System" }}</p>
+      </div>
+    </div>
+
+    <div class="mt-4 text-center">
+      <button onclick="window.print()" class="btn btn-outline-primary">
+        <i class="bi bi-printer"></i> Print Receipt
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
