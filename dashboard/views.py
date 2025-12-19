@@ -622,7 +622,6 @@ def admin_proofs(request):
     pending_count = proofs_list.filter(status='pending').count()
     received_count = proofs_list.filter(status='money_received').count()
     delivered_count = proofs_list.filter(status='money_delivered').count()
-    total_transactions = transactions.count()
     
     
     # Handle search
