@@ -215,7 +215,17 @@ def analytics_dashboard(request):
         else:
             stat['percentage'] = 0.0
     
-    # ===== OTHER METRICS =====
+    # ===== NEW VARIABLES FOR THE NEW TEMPLATE =====
+    # Calculate base currency totals (using UGX as base)
+    total_amount_base = total_amount_ugx
+    total_charges_base = total_charges_ugx
+    total_net_base = total_net
+    
+    # Calculate net to total ratio
+    net_to_total_ratio = Decimal('0')
+    if total_amount_base > Decimal('0'):
+        net_to_total_ratio = (total_net_base / total_amount_base) * Decimal('100')
+    
     # Get top performing staff
     top_staff = transactions.values(
         'confirmed_by__fullname',
@@ -259,12 +269,15 @@ def analytics_dashboard(request):
     avg_amount = Decimal(str(avg_amount_agg['avg'] or Decimal('0')))
     avg_charge = Decimal(str(avg_charge_agg['avg'] or Decimal('0')))
     
-    # Most active currency
-    most_active_currency = None
-    if currency_stats:
-        most_active_currency = max(currency_stats, key=lambda x: x['count'])
-    
     context = {
+        # NEW VARIABLES FOR THE NEW TEMPLATE
+        'total_amount_base': total_amount_base,
+        'total_charges_base': total_charges_base,
+        'total_net_base': total_net_base,
+        'overall_charge_rate': overall_charge_rate,
+        'net_to_total_ratio': net_to_total_ratio,
+        'base_currency': base_currency,
+        
         # Basic counts
         'total_transactions': total_transactions,
         'usd_count': usd_count,
@@ -326,9 +339,6 @@ def analytics_dashboard(request):
         'avg_charge': avg_charge,
         'total_amount': total_amount_ugx,  # For charge rate calculation in template
         'total_charge': total_charges_ugx,  # For charge rate calculation in template
-        
-        # For most active currency display
-        'top_currencies': currency_stats,
     }
     
     return render(request, 'dashboard/analytics.html', context)
@@ -367,141 +377,6 @@ def currency_management(request):
     }
     
     return render(request, 'dashboard/analytics.html', context)
-# def analytics_dashboard(request):
-#     # Base queryset with all related data
-#     transactions_qs = Transaction.objects.select_related(
-#         'confirmed_by',
-#         'charge_rule',
-#         'charge_rule__country',
-#         'proof'
-#     ).all()
-    
-#     # Get exchange rate for conversion
-#     try:
-#         exchange_rate = ExchangeRate.objects.filter(currency='USD').first()
-#         usd_to_ugx_rate = exchange_rate.rate_to_ugx if exchange_rate else Decimal('3800.00')
-#     except:
-#         usd_to_ugx_rate = Decimal('3800.00')  # Default rate
-    
-#     # USD transactions
-#     usd_transactions = transactions_qs.filter(currency='USD')
-#     ugx_transactions = transactions_qs.filter(currency='UGX')
-    
-#     # USD Statistics
-#     usd_stats = usd_transactions.aggregate(
-#         total_count=Count('id'),
-#         total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-#         total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-#         total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-#         avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-#         avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-#     )
-    
-#     # UGX Statistics
-#     ugx_stats = ugx_transactions.aggregate(
-#         total_count=Count('id'),
-#         total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-#         total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-#         total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-#         avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-#         avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-#     )
-    
-#     # Calculate UGX equivalent for USD transactions
-#     usd_amount_ugx = (usd_stats['total_amount'] or Decimal('0.00')) * usd_to_ugx_rate
-#     usd_charge_ugx = (usd_stats['total_charge'] or Decimal('0.00')) * usd_to_ugx_rate
-    
-#     # Calculate totals in UGX
-#     total_amount_ugx = (ugx_stats['total_amount'] or Decimal('0.00')) + usd_amount_ugx
-#     total_charges_ugx = (ugx_stats['total_charge'] or Decimal('0.00')) + usd_charge_ugx
-    
-#     # Combined statistics
-#     global_stats = transactions_qs.aggregate(
-#         total_count=Count('id'),
-#         total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-#         total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-#         total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-#         avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-#         avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-#         staff_count=Count('confirmed_by', distinct=True),
-#         currency_count=Count('currency', distinct=True),
-#         country_count=Count('charge_rule__country', distinct=True),
-#     )
-    
-#     # Calculate by currency (for stats display)
-#     currency_stats = transactions_qs.values('currency').annotate(
-#         count=Count('id'),
-#         total_amount=Sum('amount'),
-#         total_charge=Sum('charge_amount'),
-#         total_net=Sum('net_amount')
-#     ).order_by('-total_amount')
-    
-#     # Top staff by transaction count
-#     top_staff = transactions_qs.values(
-#         'confirmed_by__id', 
-#         'confirmed_by__fullname'
-#     ).annotate(
-#         transaction_count=Count('id'),
-#         total_amount=Sum('amount'),
-#         total_charge=Sum('charge_amount')
-#     ).order_by('-transaction_count')[:5]
-    
-#     # Top currencies by amount
-#     top_currencies = transactions_qs.values('currency').annotate(
-#         transaction_count=Count('id'),
-#         total_amount=Sum('amount')
-#     ).order_by('-total_amount')[:5]
-    
-#     # Calculate charge rate percentage
-#     charge_rate = 0
-#     if global_stats['total_amount'] and global_stats['total_amount'] > 0:
-#         charge_rate = (global_stats['total_charge'] / global_stats['total_amount']) * 100
-    
-#     context = {
-#         # Exchange rate
-#         'exchange_rate': usd_to_ugx_rate,
-        
-#         # USD Statistics
-#         'usd_total_amount': usd_stats['total_amount'] or Decimal('0.00'),
-#         'usd_total_charge': usd_stats['total_charge'] or Decimal('0.00'),
-#         'usd_total_net': usd_stats['total_net'] or Decimal('0.00'),
-#         'usd_count': usd_stats['total_count'] or 0,
-#         'usd_stats': usd_stats,
-        
-#         # UGX Statistics
-#         'ugx_total_amount': ugx_stats['total_amount'] or Decimal('0.00'),
-#         'ugx_total_charge': ugx_stats['total_charge'] or Decimal('0.00'),
-#         'ugx_total_net': ugx_stats['total_net'] or Decimal('0.00'),
-#         'ugx_count': ugx_stats['total_count'] or 0,
-#         'ugx_stats': ugx_stats,
-        
-#         # Converted amounts
-#         'usd_amount_ugx': usd_amount_ugx,
-#         'usd_charge_ugx': usd_charge_ugx,
-#         'total_amount_ugx': total_amount_ugx,
-#         'total_charges_ugx': total_charges_ugx,
-        
-#         # Global statistics
-#         'total_transactions': global_stats['total_count'],
-#         'total_amount': global_stats['total_amount'],
-#         'total_charge': global_stats['total_charge'],
-#         'total_net': global_stats['total_net'],
-#         'avg_amount': global_stats['avg_amount'],
-#         'avg_charge': global_stats['avg_charge'],
-#         'staff_count': global_stats['staff_count'],
-#         'currency_count': global_stats['currency_count'],
-#         'country_count': global_stats['country_count'],
-#         'charge_rate': charge_rate,
-        
-#         # Leaderboards
-#         'top_staff': top_staff,
-#         'top_currencies': list(top_currencies),
-#         'currency_stats': list(currency_stats),
-        
-#         'title': 'Financial Analytics Dashboard',
-#     }
-    
-#     return render(request, 'dashboard/analytics.html', context)
 
 
 @login_required
@@ -689,6 +564,7 @@ def admin_dashboard(request):
     total_staff = User.objects.filter(role='admin').count()
     total_clients = User.objects.filter(role='client').count()
     total_proofs = Proof.objects.count()
+    total_transactions = Transaction.objects.count()
 
     # Proof status counts
     proof_stats = Proof.objects.values('status').annotate(count=Count('id'))
@@ -717,23 +593,24 @@ def admin_dashboard(request):
         'top_clients': top_clients,
         'labels': week_labels,
         'week_data': week_data,
+        'total_transactions':total_transactions,
     }
     return render(request, 'dashboard/admin_dashboard.html', context)
 
 
-@csrf_protect
-@login_required
-def admin_proofs(request):
-    proofs_list = Proof.objects.select_related('user').order_by('-created_at')
+# @csrf_protect
+# @login_required
+# def admin_proofs(request):
+#     proofs_list = Proof.objects.select_related('user').order_by('-created_at')
 
-    paginator = Paginator(proofs_list, 10)  
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+#     paginator = Paginator(proofs_list, 10)  
+#     page_number = request.GET.get("page")
+#     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'dashboard/proofs.html', {
-        'page_obj': page_obj,
-        'proofs': page_obj.object_list, 
-    })
+#     return render(request, 'dashboard/proofs.html', {
+#         'page_obj': page_obj,
+#         'proofs': page_obj.object_list, 
+#     })
 @csrf_protect
 @login_required
 def admin_proofs(request):
@@ -745,6 +622,8 @@ def admin_proofs(request):
     pending_count = proofs_list.filter(status='pending').count()
     received_count = proofs_list.filter(status='money_received').count()
     delivered_count = proofs_list.filter(status='money_delivered').count()
+    total_transactions = transactions.count()
+    
     
     # Handle search
     search_query = request.GET.get('q', '')
@@ -781,6 +660,16 @@ def admin_proofs(request):
         'search_query': search_query,
         'status_filter': status_filter,
     })
+
+@login_required
+def delete_proof(request):
+    proof_id = request.POST.get('id')
+    try:
+        proof = Proof.objects.get(id=proof_id)
+        proof.delete()
+        return JsonResponse({'success': True, 'message': 'Proof deleted successfully.'})
+    except Proof.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Proof not found.'})
 
 @csrf_protect
 @login_required
@@ -1418,6 +1307,16 @@ def transactions(request):
     }
     
     return render(request, 'transactions/transactions.html', context)
+
+@login_required
+def delete_transaction(request):
+    transaction_id = request.POST.get('id')
+    try:
+        txn = Transaction.objects.get(id=transaction_id)
+        txn.delete()
+        return JsonResponse({'success': True, 'message': 'Transaction deleted successfully.'})
+    except Transaction.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Transaction not found.'})
 #  Excel download 
 def download_transactions_excel(transactions):
     wb = Workbook()

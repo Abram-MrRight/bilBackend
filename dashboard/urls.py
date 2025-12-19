@@ -11,6 +11,7 @@ urlpatterns = [
     # path('proofs/update-status/', views.proof_update_status, name='proof_update_status'),
     path('users/search/', views.search_users, name='search_users'),
     path('proofs/search/', views.search_proofs, name='search_proofs'),
+    path('delete-proof/', views.delete_proof, name='delete_proof'),
 
 
     #  path('users/', views.users_list, name='users'),
@@ -37,7 +38,7 @@ urlpatterns = [
 
     path('transactions/<int:id>/', views.transaction_receipt, name='transaction_receipt'),
     path('transactions/', views.transactions, name='transactions'),
-
+    path('transactions/delete/', views.delete_transaction, name='delete_transaction'),
 
     # path('dashboard/transactions/', views.transactions_list, name='transactions_list'),
 
