@@ -11,6 +11,7 @@ urlpatterns = [
     # path('proofs/update-status/', views.proof_update_status, name='proof_update_status'),
     path('users/search/', views.search_users, name='search_users'),
     path('proofs/search/', views.search_proofs, name='search_proofs'),
+    path('delete-proof/', views.delete_proof, name='delete_proof'),
 
 
     #  path('users/', views.users_list, name='users'),
@@ -37,7 +38,7 @@ urlpatterns = [
 
     path('transactions/<int:id>/', views.transaction_receipt, name='transaction_receipt'),
     path('transactions/', views.transactions, name='transactions'),
-
+    path('transactions/delete/', views.delete_transaction, name='delete_transaction'),
 
     # path('dashboard/transactions/', views.transactions_list, name='transactions_list'),
 
@@ -81,5 +82,11 @@ urlpatterns = [
     path('contacts_list/', views.contacts_list, name='contacts_list'),
     path('edit-contact/<int:contact_id>/', views.edit_whatsapp_contact, name='edit_contact'),
     path('delete-contact/<int:contact_id>/', views.delete_whatsapp_contact, name='delete_contact'),
+    path('admin/system-status/', views.system_status, name='system_status'),
+    path('admin/system-status/delete-old-data/', views.delete_old_data, name='delete_old_data'),
 
+    path('announcements/', views.announcement_list, name='announcement_list'),
+    path('announcements/add/', views.announcement_create, name='announcement_create'),
+    path('announcements/<int:pk>/edit/', views.announcement_update, name='announcement_update'),
+    path('announcements/<int:pk>/delete/', views.announcement_delete, name='announcement_delete'),
 ]
