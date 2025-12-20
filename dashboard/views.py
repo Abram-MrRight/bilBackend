@@ -1,9 +1,10 @@
+import os
 from pyexpat.errors import messages
 import uuid
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from api.models import Agent, ChargeRule, CompanyInfo, Country, Currency, ExchangeRate, Proof, Transaction, UploadProofStep, User, WhatsAppContact
+from api.models import Agent, Announcement, ChargeRule, CompanyInfo, Country, Currency, ExchangeRate, Proof, Transaction, UploadProofStep, User, WhatsAppContact
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -23,7 +24,7 @@ from django.apps import apps
 from django.forms import modelform_factory
 from django.contrib import messages
 from datetime import datetime
-from dashboard.forms import AgentForm, ChargeRuleForm, CompanyInfoForm, CountryForm, CurrencyForm, ProfileForm, UploadProofStepForm, UserDetailForm, UserEditForm, UserRegistrationForm, WhatsAppContactForm
+from dashboard.forms import AgentForm, AnnouncementForm, ChargeRuleForm, CompanyInfoForm, CountryForm, CurrencyForm, ProfileForm, UploadProofStepForm, UserDetailForm, UserEditForm, UserRegistrationForm, WhatsAppContactForm
 # views.py
 import datetime
 import io
@@ -48,7 +49,7 @@ import json
 
 from api.models import Transaction, ExchangeRate
 from decimal import Decimal
-
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 
 from decimal import Decimal, ROUND_HALF_UP
@@ -57,6 +58,136 @@ from django.db.models import Avg, F, Q
 from decimal import Decimal
 from collections import defaultdict
 from django.conf import settings 
+
+import shutil
+import psutil
+from django.shortcuts import render
+from datetime import datetime, timedelta
+
+def get_file_size(file_field):
+    """Return file size in MB, 0 if no file."""
+    if file_field and file_field.name:
+        try:
+            return os.path.getsize(file_field.path) / (1024 ** 2) 
+        except:
+            return 0
+    return 0
+
+@staff_member_required
+def system_status(request):
+    # --- CPU ---
+    cpu_percent = psutil.cpu_percent(interval=1)
+    cpu_high = cpu_percent > 80
+    cpu_warning = 60 < cpu_percent <= 80
+
+    # --- RAM ---
+    mem = psutil.virtual_memory()
+    ram_total = round(mem.total / (1024 ** 3), 2)
+    ram_used = round(mem.used / (1024 ** 3), 2)
+    ram_percent = mem.percent
+    ram_high = ram_percent > 80
+    ram_warning = 60 < ram_percent <= 80
+
+    # --- Disk ---
+    disk = shutil.disk_usage('/')
+    disk_total = round(disk.total / (1024 ** 3), 2)
+    disk_used = round(disk.used / (1024 ** 3), 2)
+    disk_percent = round(disk.used / disk.total * 100, 2)
+    disk_high = disk_percent > 80
+    disk_warning = 60 < disk_percent <= 80
+
+    # --- Swap ---
+    swap = psutil.swap_memory()
+    swap_total = round(swap.total / (1024 ** 3), 2)
+    swap_used = round(swap.used / (1024 ** 3), 2)
+    swap_percent = swap.percent
+    swap_high = swap_percent > 80
+    swap_warning = 60 < swap_percent <= 80
+
+    # --- Old Data (>3 months) ---
+    three_months_ago = timezone.now() - timedelta(days=90)
+
+    old_proofs = Proof.objects.filter(created_at__lt=three_months_ago)
+    old_transactions = Transaction.objects.filter(confirmed_at__lt=three_months_ago)
+    old_announcements = Announcement.objects.filter(created_at__lt=three_months_ago)
+
+    def get_files_size(queryset, file_field):
+        total_bytes = 0
+        for obj in queryset:
+            file = getattr(obj, file_field, None)
+            if file and os.path.exists(file.path):
+                total_bytes += os.path.getsize(file.path)
+        return round(total_bytes / (1024 * 1024), 2)  # in MB
+
+    context = {
+        'cpu_percent': cpu_percent,
+        'cpu_high': cpu_high,
+        'cpu_warning': cpu_warning,
+        'ram_total': ram_total,
+        'ram_used': ram_used,
+        'ram_percent': ram_percent,
+        'ram_high': ram_high,
+        'ram_warning': ram_warning,
+        'disk_total': disk_total,
+        'disk_used': disk_used,
+        'disk_percent': disk_percent,
+        'disk_high': disk_high,
+        'disk_warning': disk_warning,
+        'swap_total': swap_total,
+        'swap_used': swap_used,
+        'swap_percent': swap_percent,
+        'swap_high': swap_high,
+        'swap_warning': swap_warning,
+        'old_proofs_count': old_proofs.count(),
+        'old_proofs_size': get_files_size(old_proofs, 'image'),
+        'old_transactions_count': old_transactions.count(),
+        'old_transactions_size': get_files_size(old_transactions, 'receipt_file'),
+        'old_announcements_count': old_announcements.count(),
+        'old_announcements_size': get_files_size(old_announcements, 'image'),
+    }
+    return render(request, 'system_monitoring/system_status.html', context)
+
+
+def delete_old_data(request):
+    """Delete all old files (Proofs, Transactions, Announcements) older than 3 months"""
+    three_months_ago = datetime.now() - timedelta(days=90)
+    
+    # Delete old proofs
+    old_proofs = Proof.objects.filter(created_at__lt=three_months_ago)
+    proofs_count = old_proofs.count()
+    for proof in old_proofs:
+        if proof.image:
+            try:
+                os.remove(proof.image.path)
+            except:
+                pass
+    old_proofs.delete()
+
+    # Delete old transactions
+    old_transactions = Transaction.objects.filter(confirmed_at__lt=three_months_ago)
+    transactions_count = old_transactions.count()
+    for txn in old_transactions:
+        if txn.receipt_file:
+            try:
+                os.remove(txn.receipt_file.path)
+            except:
+                pass
+    old_transactions.delete()
+
+    # Delete old announcements
+    old_announcements = Announcement.objects.filter(created_at__lt=three_months_ago)
+    announcements_count = old_announcements.count()
+    for ann in old_announcements:
+        if ann.image:
+            try:
+                os.remove(ann.image.path)
+            except:
+                pass
+    old_announcements.delete()
+
+    messages.success(request, f"{proofs_count} old proof(s), {transactions_count} old transaction(s), "
+                              f"and {announcements_count} old announcement(s) deleted successfully.")
+    return redirect('system_status')
 
 def format_money(amount, decimals=4):
     """Format Decimal or float to string with commas and fixed decimals."""
@@ -621,8 +752,7 @@ def admin_proofs(request):
     total_proofs = proofs_list.count()
     pending_count = proofs_list.filter(status='pending').count()
     received_count = proofs_list.filter(status='money_received').count()
-    delivered_count = proofs_list.filter(status='money_delivered').count()
-    
+    delivered_count = proofs_list.filter(status='money_delivered').count()    
     
     # Handle search
     search_query = request.GET.get('q', '')
@@ -1576,3 +1706,47 @@ def delete_whatsapp_contact(request, contact_id):
         messages.success(request, 'Contact deleted successfully.')
         return redirect('contacts_list')
     return render(request, 'contacts/delete_contact.html', {'contact': contact, 'title': 'Delete Contact'})
+# List all announcements
+def announcement_list(request):
+    announcements = Announcement.objects.all()
+    return render(request, 'announcements/announcement_list.html', {'announcements': announcements})
+
+# Create new announcement
+def announcement_create(request):
+    if request.method == 'POST':
+        form = AnnouncementForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Announcement created successfully.')
+            return redirect('announcement_list')
+    else:
+        form = AnnouncementForm()
+    return render(request, 'announcements/announcement_form.html', {'form': form, 'title': 'Add Announcement'})
+
+# Update announcement
+def announcement_update(request, pk):
+    announcement = get_object_or_404(Announcement, pk=pk)
+    if request.method == 'POST':
+        form = AnnouncementForm(request.POST, request.FILES, instance=announcement)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Announcement updated successfully.')
+            return redirect('announcement_list')
+    else:
+        form = AnnouncementForm(instance=announcement)
+    return render(request, 'announcements/announcement_form.html', {'form': form, 'title': 'Edit Announcement'})
+
+# Delete announcement
+def announcement_delete(request, pk):
+    announcement = get_object_or_404(Announcement, pk=pk)
+    if request.method == 'POST':
+        if announcement.image:
+            try:
+                import os
+                os.remove(announcement.image.path)
+            except:
+                pass
+        announcement.delete()
+        messages.success(request, 'Announcement deleted successfully.')
+        return redirect('announcement_list')
+    return render(request, 'announcements/announcement_confirm_delete.html', {'announcement': announcement})

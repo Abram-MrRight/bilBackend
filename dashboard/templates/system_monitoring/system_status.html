@@ -1,0 +1,60 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}System Status{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Server Monitoring Dashboard</h2>
+
+    <!-- CPU -->
+    <h5>CPU Usage</h5>
+    <div class="progress mb-3" style="height:25px;">
+      <div class="progress-bar {% if cpu_high %}bg-danger{% elif cpu_warning %}bg-warning{% else %}bg-success{% endif %}" 
+           role="progressbar" style="width: {{ cpu_percent }}%;" aria-valuenow="{{ cpu_percent }}" aria-valuemin="0" aria-valuemax="100">
+        {{ cpu_percent }}%
+      </div>
+    </div>
+
+    <!-- RAM -->
+    <h5>RAM Usage</h5>
+    <div class="progress mb-3" style="height:25px;">
+      <div class="progress-bar {% if ram_high %}bg-danger{% elif ram_warning %}bg-warning{% else %}bg-success{% endif %}" 
+           role="progressbar" style="width: {{ ram_percent }}%;" aria-valuenow="{{ ram_percent }}" aria-valuemin="0" aria-valuemax="100">
+        {{ ram_used }} GB / {{ ram_total }} GB ({{ ram_percent }}%)
+      </div>
+    </div>
+
+    <!-- Disk -->
+    <h5>Disk Usage</h5>
+    <div class="progress mb-3" style="height:25px;">
+      <div class="progress-bar {% if disk_high %}bg-danger{% elif disk_warning %}bg-warning{% else %}bg-success{% endif %}" 
+           role="progressbar" style="width: {{ disk_percent }}%;" aria-valuenow="{{ disk_percent }}" aria-valuemin="0" aria-valuemax="100">
+        {{ disk_used }} GB / {{ disk_total }} GB ({{ disk_percent }}%)
+      </div>
+    </div>
+
+    <!-- Swap -->
+    <h5>Swap Usage</h5>
+    <div class="progress mb-3" style="height:25px;">
+      <div class="progress-bar {% if swap_high %}bg-danger{% elif swap_warning %}bg-warning{% else %}bg-success{% endif %}" 
+           role="progressbar" style="width: {{ swap_percent }}%;" aria-valuenow="{{ swap_percent }}" aria-valuemin="0" aria-valuemax="100">
+        {{ swap_used }} GB / {{ swap_total }} GB ({{ swap_percent }}%)
+      </div>
+    </div>
+
+    <!-- Old Data -->
+    <h5>Old Data (>3 months)</h5>
+    <ul>
+        <li>{{ old_proofs_count }} old proof(s) – {{ old_proofs_size }} MB</li>
+        <li>{{ old_transactions_count }} old transaction(s) – {{ old_transactions_size }} MB</li>
+        <li>{{ old_announcements_count }} old announcement(s) – {{ old_announcements_size }} MB</li>
+    </ul>
+
+    {% if old_proofs_count > 0 or old_transactions_count > 0 or old_announcements_count > 0 %}
+        <form method="POST" action="{% url 'delete_old_data' %}" onsubmit="return confirm('Are you sure you want to delete all old data? This cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger mb-3">Delete All Old Data</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
