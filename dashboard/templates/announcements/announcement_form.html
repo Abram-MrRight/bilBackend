@@ -1,0 +1,37 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">{{ title }}</h4>
+        </div>
+        <div class="card-body">
+            {% load widget_tweaks %}
+
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    {{ form.title.label_tag }}
+                    {{ form.title|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                    {{ form.description.label_tag }}
+                    {{ form.description|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                    {{ form.image.label_tag }}
+                    {{ form.image|add_class:"form-control" }}
+                </div>
+                <div class="mb-3 form-check">
+                    {{ form.is_active }}
+                    {{ form.is_active.label_tag }}
+                </div>
+
+                <button type="submit" class="btn btn-success">Save</button>
+                <a href="{% url 'announcement_list' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
