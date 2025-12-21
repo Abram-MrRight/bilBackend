@@ -510,12 +510,12 @@ def currency_management(request):
     return render(request, 'dashboard/analytics.html', context)
 
 
-@login_required
+@login_required(login_url='admin_login')
 def country_list(request):
     countries = Country.objects.all()
     return render(request, 'country/list.html', {'countries': countries})
 
-@login_required
+@login_required(login_url='admin_login')
 def add_country(request):
     if request.method == 'POST':
         form = CountryForm(request.POST)
@@ -529,7 +529,7 @@ def add_country(request):
         form = CountryForm()
     return render(request, 'country/add.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def edit_country(request, pk):
     country = get_object_or_404(Country, pk=pk)
@@ -543,7 +543,7 @@ def edit_country(request, pk):
         form = CountryForm(instance=country)
     return render(request, 'country/edit.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def delete_country(request, pk):
     country = get_object_or_404(Country, pk=pk)
@@ -552,13 +552,13 @@ def delete_country(request, pk):
     return redirect('country_list')
 
 #  CURRENCY VIEWS 
-@login_required
+@login_required(login_url='admin_login')
 
 def currency_list(request):
     currencies = Currency.objects.select_related('country').all()
     return render(request, 'currency/list.html', {'currencies': currencies})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def add_currency(request):
     if request.method == 'POST':
@@ -571,7 +571,7 @@ def add_currency(request):
         form = CurrencyForm()
     return render(request, 'currency/add.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def edit_currency(request, pk):
     currency = get_object_or_404(Currency, pk=pk)
@@ -585,7 +585,7 @@ def edit_currency(request, pk):
         form = CurrencyForm(instance=currency)
     return render(request, 'currency/edit.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def delete_currency(request, pk):
     currency = get_object_or_404(Currency, pk=pk)
@@ -600,13 +600,13 @@ def get_currencies(request, country_id):
 
 
 #  CHARGERULE VIEWS 
-@login_required
+@login_required(login_url='admin_login')
 
 def charge_rule_list(request):
     rules = ChargeRule.objects.select_related('country', 'currency').all()
     return render(request, 'charge_rule/list.html', {'rules': rules})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def add_charge_rule(request):
     if request.method == 'POST':
@@ -621,7 +621,7 @@ def add_charge_rule(request):
         form = ChargeRuleForm()
     return render(request, 'charge_rule/add.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def edit_charge_rule(request, pk):
     charge = get_object_or_404(ChargeRule, pk=pk)
@@ -637,7 +637,7 @@ def edit_charge_rule(request, pk):
         form = ChargeRuleForm(instance=charge)
     return render(request, 'charge_rule/edit.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def delete_charge_rule(request, pk):
     charge = get_object_or_404(ChargeRule, pk=pk)
@@ -689,7 +689,7 @@ def exchange_rate_add(request):
 
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_dashboard(request):
     # Main totals
     total_staff = User.objects.filter(role='admin').count()
@@ -728,22 +728,8 @@ def admin_dashboard(request):
     }
     return render(request, 'dashboard/admin_dashboard.html', context)
 
-
-# @csrf_protect
-# @login_required
-# def admin_proofs(request):
-#     proofs_list = Proof.objects.select_related('user').order_by('-created_at')
-
-#     paginator = Paginator(proofs_list, 10)  
-#     page_number = request.GET.get("page")
-#     page_obj = paginator.get_page(page_number)
-
-#     return render(request, 'dashboard/proofs.html', {
-#         'page_obj': page_obj,
-#         'proofs': page_obj.object_list, 
-#     })
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_proofs(request):
     # Get all proofs
     proofs_list = Proof.objects.all().order_by('-created_at')
@@ -790,7 +776,7 @@ def admin_proofs(request):
         'status_filter': status_filter,
     })
 
-@login_required
+@login_required(login_url='admin_login')
 def delete_proof(request):
     proof_id = request.POST.get('id')
     try:
@@ -801,20 +787,20 @@ def delete_proof(request):
         return JsonResponse({'success': False, 'message': 'Proof not found.'})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_reports(request):
     reports = Proof.objects.values('status').annotate(total=Count('id')).order_by('-total')
     return render(request, 'dashboard/reports.html', {'reports': reports})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_analytics(request):
     data = Proof.objects.extra({'day': "date(created_at)"}).values('day').annotate(total=Count('id')).order_by('day')
     return render(request, 'dashboard/analytics.html', {'data': data})
 
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def users_list(request):
     users_queryset = User.objects.all().order_by('-id')
     
@@ -851,7 +837,7 @@ def users_list(request):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_user(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST, request.FILES)
@@ -872,7 +858,7 @@ def add_user(request):
     return render(request, 'users/user_form.html', {'form': form, 'title': 'Register User'})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_user(request, pk):
     # Force JSON response for AJAX requests
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.method == 'POST':
@@ -914,7 +900,7 @@ def delete_user(request, pk):
     }, status=405)
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_user(request, pk): 
     user = get_object_or_404(User, id=pk)
 
@@ -940,8 +926,7 @@ def edit_user(request, pk):
 
     return render(request, 'users/user_form.html', {'form': form, 'title': 'Edit User'})
 
-@csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def proof_detail(request, proof_id):
     """Return proof details as JSON"""
     try:
@@ -962,7 +947,7 @@ def proof_detail(request, proof_id):
 
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def search_users(request):
     """Return filtered users as JSON"""
     query = request.GET.get('q', '').strip()
@@ -987,7 +972,7 @@ def search_users(request):
     return JsonResponse({'users': data})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def search_proofs(request):
     """Return filtered proofs as JSON"""
     query = request.GET.get('q', '').strip()
@@ -1011,39 +996,53 @@ def search_proofs(request):
     return JsonResponse({'proofs': data})
 
 @csrf_protect
-def web_login(request):
+def admin_login(request):
+    if request.user.is_authenticated:
+        return redirect('admin_dashboard')
+
     if request.method == "POST":
-        username = request.POST.get('username')
+        email = request.POST.get('email')
         password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user:
+
+        user = authenticate(request, email=email, password=password)
+
+        if (
+            user
+            and user.is_active
+            and user.is_staff
+            and user.role in ['super_admin']
+        ):
             login(request, user)
+            request.session.cycle_key()
             return redirect('admin_dashboard')
-        return render(request, 'dashboard/login.html', {'error': 'Invalid credentials'})
+
+        messages.error(request, "Invalid credentials or access denied.")
+
     return render(request, 'dashboard/login.html')
 
+
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def company_info(request):
     data = CompanyInfo.objects.all()
     return render(request, 'dashboard/company_info.html', {'companies': data})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def agents_list(request):
     data = Agent.objects.all()
     return render(request, 'dashboard/agents.html', {'agents': data})
 
 # --- List Agents ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def agents_list(request):
     agents = Agent.objects.all()
     return render(request, 'agents/agents.html', {'agents': agents, 'page_title': 'Agents'})
 
 # --- Add Agent ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_agent(request):
     form = AgentForm(request.POST or None, request.FILES or None)
     if form.is_valid():
@@ -1054,7 +1053,7 @@ def add_agent(request):
 
 # --- Edit Agent ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_agent(request, pk):
     agent = get_object_or_404(Agent, pk=pk)
     form = AgentForm(request.POST or None, request.FILES or None, instance=agent)
@@ -1066,7 +1065,7 @@ def edit_agent(request, pk):
 
 # --- Delete Agent ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_agent(request, pk):
     agent = get_object_or_404(Agent, pk=pk)
     if request.method == 'POST':
@@ -1080,7 +1079,7 @@ def delete_agent(request, pk):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def company_info(request):
  
     companies = CompanyInfo.objects.all()
@@ -1091,7 +1090,7 @@ def company_info(request):
     return render(request, 'company_info/company_info.html', context)
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_company(request):
     if request.method == "POST":
         form = CompanyInfoForm(request.POST, request.FILES)
@@ -1108,7 +1107,7 @@ def add_company(request):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_company(request, pk):
     company = get_object_or_404(CompanyInfo, pk=pk)
     if request.method == 'POST':
@@ -1127,7 +1126,7 @@ def edit_company(request, pk):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_company(request, pk):
     company = get_object_or_404(CompanyInfo, pk=pk)
     if request.method == 'POST':
@@ -1142,11 +1141,11 @@ def delete_company(request, pk):
         'cancel_url': '/company-info/'  # optional: cancel button URL
     })
 
-@login_required
+@login_required(login_url='admin_login')
 def profile_view(request):
     return render(request, 'profile/profile.html', {'user': request.user})
 
-@login_required
+@login_required(login_url='admin_login')
 def profile_edit(request):
     if request.method == 'POST':
         form = ProfileForm(request.POST, instance=request.user)
@@ -1160,8 +1159,7 @@ def profile_edit(request):
 
 def logout_view(request):
     logout(request)
-    messages.success(request, "You have been logged out successfully.")
-    return redirect('login')
+    return redirect('admin_login')
 
 
 def transaction_receipt(request, id):
@@ -1437,7 +1435,7 @@ def transactions(request):
     
     return render(request, 'transactions/transactions.html', context)
 
-@login_required
+@login_required(login_url='admin_login')
 def delete_transaction(request):
     transaction_id = request.POST.get('id')
     try:
@@ -1568,14 +1566,14 @@ def exchange_rate_delete(request, id):
 
 # List
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def proof_steps_list(request):
     steps = UploadProofStep.objects.all()
     return render(request, 'upload_guide/steps_list.html', {'steps': steps, 'title': 'Upload Proof Steps'})
 
 # Add
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_proof_step(request):
     if request.method == "POST":
         form = UploadProofStepForm(request.POST)
@@ -1590,7 +1588,7 @@ def add_proof_step(request):
 
 # Edit
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_proof_step(request, pk):
     step = get_object_or_404(UploadProofStep, pk=pk)
     if request.method == 'POST':
@@ -1606,7 +1604,7 @@ def edit_proof_step(request, pk):
 
 # Delete
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_proof_step(request, pk):
     step = get_object_or_404(UploadProofStep, pk=pk)
     if request.method == 'POST':
@@ -1620,7 +1618,7 @@ def delete_proof_step(request, pk):
         'cancel_url': '/upload-proof-steps/'  # Adjust to list URL
     })
 
-@login_required
+@login_required(login_url='admin_login')
 def add_whatsapp_contact(request):
     if request.method == 'POST':
         form = WhatsAppContactForm(request.POST)
@@ -1640,7 +1638,7 @@ def add_whatsapp_contact(request):
     return render(request, 'contacts/add_contact.html', context)
 
 
-@login_required
+@login_required(login_url='admin_login')
 def contacts_list(request):
     contacts = WhatsAppContact.objects.all().order_by('-id')
 
@@ -1682,7 +1680,7 @@ def contacts_list(request):
 
 
 
-@login_required
+@login_required(login_url='admin_login')
 def edit_whatsapp_contact(request, contact_id):
     contact = WhatsAppContact.objects.get(id=contact_id)
 
@@ -1698,7 +1696,7 @@ def edit_whatsapp_contact(request, contact_id):
     return render(request, 'contacts/edit_contact.html', {'form': form, 'contact': contact, 'title': 'Edit Contact'})
 
 
-@login_required
+@login_required(login_url='admin_login')
 def delete_whatsapp_contact(request, contact_id):
     contact = WhatsAppContact.objects.get(id=contact_id)
     if request.method == 'POST':
