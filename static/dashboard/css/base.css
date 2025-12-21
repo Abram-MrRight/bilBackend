@@ -1,13 +1,13 @@
 :root {
     --sidebar-bg: linear-gradient(180deg, #1a3c40 0%, #1E7F7F 100%);
-    --nav-active: linear-gradient(90deg, #ff6b6b 0%, #ff4d4d 100%);
+    --nav-active: linear-gradient(90deg, #1E7F7F 0%, #4AC4C4 100%) !important;
     --nav-hover: rgba(255, 255, 255, 0.15);
     --nav-text: rgba(255, 255, 255, 0.9);
     --nav-icon: rgba(255, 255, 255, 0.7);
     --submenu-bg: rgba(0, 0, 0, 0.2);
     --border-radius: 10px;
     --transition-speed: 0.3s;
-}
+} 
 
 /* ---------- Sidebar ---------- */
 .sidebar {
@@ -127,6 +127,7 @@
     box-shadow: 0 4px 15px rgba(255, 77, 77, 0.3);
     border: none;
     transform: translateX(5px);
+    border-left: 3px solid #4AC4C4 !important;
 }
 
 .sidebar .nav-link.active i {
@@ -233,7 +234,7 @@
 }
 
 .sidebar .submenu .nav-link.active {
-    background: rgba(255, 107, 107, 0.2);
+    background: linear-gradient(90deg, #1E7F7F 0%, #4AC4C4 100%) !important;
     color: #ff4d4d !important;
     font-weight: 600;
     border-left: 4px solid #ff4d4d;
@@ -398,7 +399,7 @@
 }
 
 /* ---------- Main Content ---------- */
-.main-content { margin-left: 280px; transition: margin-left 0.3s ease; }
+.main-content { margin-left: 280px; }
 .sidebar.collapsed ~ .main-content { margin-left: 80px; }
 .page-wrapper { padding: 100px 30px 20px 30px; }
 
@@ -446,13 +447,7 @@
 }
 /* Dashboard Specific Styles */
 .sidebar .nav-link[data-url-name="admin_dashboard"] {
-    border-left: 3px solid #4AC4C4 !important;
-    background: linear-gradient(90deg, #1E7F7F 0%, #4AC4C4 100%) !important;
-}
-
-.sidebar .nav-link[data-url-name="admin_dashboard"]:not(.active):hover {
-    background: rgba(74, 196, 196, 0.15) !important;
-    border-left-color: #1E7F7F !important;
+    background: linear-gradient(90deg, #1E7F7F 0%) !important;
 }
 
 /* Make dashboard icon always stand out */
@@ -463,4 +458,281 @@
 .sidebar .nav-link[data-url-name="admin_dashboard"]:hover i,
 .sidebar .nav-link[data-url-name="admin_dashboard"].active i {
     color: #ffffff !important;
+}
+/* ===== MOBILE RESPONSIVENESS ===== */
+
+/* Overlay for mobile sidebar */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    backdrop-filter: blur(3px);
+    transition: opacity 0.3s ease;
+    opacity: 0;
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+/* Tablet (768px and below) */
+@media (max-width: 768px) {
+    body {
+        overflow-x: hidden;
+        position: relative;
+    }
+
+    /* Sidebar hidden by default on mobile */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -280px !important; /* Force hidden on mobile */
+        width: 280px;
+        height: 100vh;
+        z-index: 1050;
+        transition: left 0.3s ease-in-out;
+        box-shadow: 5px 0 25px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Show sidebar when .show class is added */
+    .sidebar.show {
+        left: 0 !important;
+    }
+
+    /* Hide desktop toggle button on mobile */
+    #sidebar-toggle {
+        display: none !important;
+    }
+
+    /* Main content full width on mobile */
+    .main-content {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
+    /* Topbar adjustments for mobile */
+    .topbar {
+        left: 0 !important;
+        padding: 1rem;
+        position: fixed;
+        top: 0;
+        z-index: 1030;
+        width: 100%;
+    }
+
+    .topbar .title {
+        font-size: 1.1rem;
+        margin-left: 1rem;
+    }
+
+    /* Page wrapper adjustments */
+    .page-wrapper {
+        padding: 90px 15px 20px 15px;
+        width: 100%;
+    }
+
+    /* Mobile menu button styling */
+    #mobileSidebarToggle {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
+        z-index: 1031;
+    }
+
+    #mobileSidebarToggle:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(1.05);
+    }
+
+    /* Disable collapsed mode on mobile */
+    .sidebar.collapsed {
+        width: 280px !important;
+        left: -280px !important;
+    }
+
+    .sidebar.collapsed.show {
+        left: 0 !important;
+    }
+
+    .sidebar.collapsed .nav-link span {
+        display: inline-block !important;
+        margin-left: 0.75rem;
+    }
+
+    .sidebar.collapsed .nav-link {
+        padding: 0.85rem 1.25rem !important;
+        justify-content: flex-start !important;
+    }
+
+    .sidebar.collapsed .nav-link i {
+        margin: 0;
+        min-width: 28px;
+    }
+
+    .sidebar.collapsed .tooltip-text {
+        display: none !important;
+    }
+
+    .sidebar.collapsed .submenu {
+        position: static !important;
+        margin-left: 1rem;
+        background: rgba(0, 0, 0, 0.15);
+        box-shadow: none;
+        animation: none;
+    }
+
+    /* Adjust submenu for mobile */
+    .sidebar .submenu .nav-link {
+        padding: 0.7rem 1.25rem 0.7rem 2.5rem;
+    }
+
+    .sidebar .submenu .nav-link::before {
+        left: 1.5rem;
+    }
+
+    /* Make sure sidebar doesn't overlap topbar */
+    .sidebar {
+        top: 0;
+        height: 100vh;
+    }
+}
+
+/* Small phones (576px and below) */
+@media (max-width: 576px) {
+    .sidebar {
+        width: 270px;
+        left: -270px !important;
+    }
+
+    .sidebar.show {
+        left: 0 !important;
+    }
+
+    .sidebar.collapsed {
+        width: 270px !important;
+        left: -270px !important;
+    }
+
+    .sidebar.collapsed.show {
+        left: 0 !important;
+    }
+
+    .topbar {
+        padding: 0.75rem;
+    }
+
+    .topbar .title {
+        font-size: 1rem;
+        margin-left: 0.5rem;
+    }
+
+    .page-wrapper {
+        padding: 80px 12px 15px 12px;
+    }
+
+    .user-info .text-white {
+        font-size: 0.9rem;
+    }
+
+    .avatar-placeholder {
+        width: 32px !important;
+        height: 32px !important;
+    }
+
+    /* Make touch targets larger for mobile */
+    .btn, .nav-link, .dropdown-item {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Prevent zoom on form inputs in iOS */
+    .form-control, .form-select {
+        font-size: 16px;
+        min-height: 44px;
+    }
+
+    /* Adjust dropdown for mobile */
+    .user-info .dropdown-menu {
+        position: fixed !important;
+        top: 60px !important;
+        left: 15px !important;
+        right: 15px !important;
+        width: auto !important;
+    }
+}
+
+/* Large tablets (769px to 992px) */
+@media (min-width: 769px) {
+    /* Hide mobile toggle on desktop/tablet */
+    #mobileSidebarToggle {
+        display: none !important;
+    }
+
+    /* Show desktop toggle */
+    #sidebar-toggle {
+        display: flex !important;
+    }
+    
+    /* Remove mobile overlay */
+    .sidebar-overlay {
+        display: none !important;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .sidebar .nav-link:hover {
+        transform: none !important;
+    }
+
+    .sidebar .nav-link:active {
+        background: var(--nav-hover);
+        transform: scale(0.98) !important;
+    }
+
+    #sidebar-toggle:hover {
+        transform: none;
+    }
+
+    #sidebar-toggle:active {
+        transform: scale(0.95);
+    }
+}
+
+/* Prevent horizontal scroll */
+body {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .topbar,
+    #mobileSidebarToggle,
+    .sidebar-overlay {
+        display: none !important;
+    }
+    
+    .main-content {
+        margin-left: 0 !important;
+    }
+    
+    .page-wrapper {
+        padding: 0 !important;
+        margin-top: 0 !important;
+    }
 }
