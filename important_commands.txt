@@ -1,2 +1,21 @@
 venv\Scripts\Activate
 pip freeze > requirements.txt
+
+
+db staging
+# Log into PostgreSQL
+sudo -u postgres psql
+
+# Create a database and user
+CREATE DATABASE bil_staging;
+CREATE USER bil_user WITH PASSWORD 'Abraham44&';
+GRANT ALL PRIVILEGES ON DATABASE bil_staging TO bil_user;
+\q
+
+sudo -u postgres psql
+ALTER USER bil_user WITH SUPERUSER;
+
+---super user
+Email: atongkurabraham@gmail.com
+Fullname: Atong Abraham
+password Abraham44&

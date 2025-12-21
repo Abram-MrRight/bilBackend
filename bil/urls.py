@@ -13,7 +13,6 @@ urlpatterns = [
     path('', include('dashboard.urls')),
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
-    path('login/', dashboard_views.web_login, name='login'),
     path('dashboard/', include('dashboard.urls')),
 
 

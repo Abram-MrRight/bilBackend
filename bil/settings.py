@@ -26,8 +26,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-3x%pek=)69b)*e5vvq4x8hp_@!4+8(=8#_+v9zrg6lndze*&7v'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
+# Session security
+SESSION_COOKIE_AGE = 60 * 30        # 30 minutes
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_SAVE_EVERY_REQUEST = True
 
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True 
+CSRF_COOKIE_SECURE = True
+
+# Prevent JS access
+CSRF_COOKIE_HTTPONLY = True
+LOGIN_ATTEMPTS_LIMIT = 5
 
 # ALLOWED_HOSTS = ['localhost', '10.10.76.75', '127.0.0.1', '10.0.2.2']
 ALLOWED_HOSTS = ['*']
@@ -153,31 +164,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-JAZZMIN_SETTINGS = {
-    "site_title": "BilApp Admin",
-    "site_header": "BilApp Dashboard",
-    "site_brand": "BilApp",
-    "welcome_sign": "Welcome to BilApp Admin",
-    "copyright": "BilApp 2025",
-    "search_model": "auth.User",
-    "topmenu_links": [
-        {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
-        {"model": "api.proof"},
-        {"model": "api.user"},
-    ],
-    "show_sidebar": True,
-    "related_modal_active": True,
-    "icons": {
-        "auth.User": "fas fa-user",
-        "api.Proof": "fas fa-file-invoice",
-        "api.StatusUpdate": "fas fa-info-circle",
-        "api.CompanyInfo": "fas fa-building",
-        "api.Agent": "fas fa-user-tie",
-    },
-    "theme": "darkly",
-}
-
 LOGIN_URL = '/login/'       
 LOGIN_REDIRECT_URL = '/' 
 
@@ -194,3 +180,43 @@ DEFAULT_FROM_EMAIL = 'Bior Investments LTD <malukabrahamkur@gmail.com>'
 # settings.py
 FRONTEND_URL = "http://127.0.0.1:8000/api"
 DEFAULT_FROM_EMAIL = "noreply@example.com"
+
+# Jazzmin settings
+JAZZMIN_SETTINGS = {
+    "site_title": "My Admin",
+    "site_header": "Dashboard",
+    "site_brand": "MyBrand",
+    "site_icon": None,  # you can put "/static/img/logo.png" if you have one
+
+    # Top menu links (optional)
+    "topmenu_links": [
+        {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
+    ],
+
+    # Hide apps you don’t need in the sidebar
+    "hide_apps": [
+        "authtoken",            
+        "token_blacklist",     
+    ],
+
+    # Hide specific models if needed
+    "hide_models": [
+        "contenttypes.contenttype",
+    ],
+
+    # Order apps in the sidebar
+    "order_with_respect_to": [
+        "dashboard",           
+        "api",                 
+    ],
+
+    # Icons for apps and models (optional)
+    "icons": {
+        "dashboard": "fas fa-tachometer-alt",
+        "api": "fas fa-cogs",
+    },
+
+    # Default list display behavior
+    "show_ui_builder": True,
+}
+
