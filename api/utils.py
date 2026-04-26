@@ -1,4 +1,7 @@
+import base64
 from io import BytesIO
+import os
+from pathlib import Path
 import textwrap
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -11,13 +14,20 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from api.models import CompanyInfo
+from api import models
+from api.models import CompanyInfo, ExchangeRate
 from datetime import datetime
-
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 import qrcode
 from reportlab.lib.utils import ImageReader
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from decimal import Decimal
+from django.utils.timezone import now
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+CERTS_DIR = os.path.join(BASE_DIR, 'certs')
 
 def get_company_info():
     
@@ -331,3 +341,52 @@ Best regards,
     except Exception as e:
         print(f"✗ Failed to send email: {e}")
         return False
+    
+def decrypt_message(encoded_encrypted_msg):
+    if not len(encoded_encrypted_msg) == 344:
+        encoded_encrypted_msg = "Ciphertext with incorrect length" + encoded_encrypted_msg
+
+    privatekey = RSA.import_key(open(CERTS_DIR +'/bil_send.key', 'r').read())
+    decrypt = PKCS1_OAEP.new(key=privatekey)
+
+    # Decode the base64 encoded message
+    encrypted_bytes = base64.b64decode(encoded_encrypted_msg)
+
+    # Initialize the cipher with the private key for decryption
+    cipher_rsa = PKCS1_OAEP.new(privatekey)
+
+    # Decrypt the message
+    decrypted_message = cipher_rsa.decrypt(encrypted_bytes)
+
+    # Convert the decrypted message to a string
+    decrypted_message_str = decrypted_message.decode('utf-8')
+    # print("Decrypted Message:", decrypted_message_str)
+
+    return decrypted_message_str
+
+########## READ THE PUBLIC KEY AND PRIVATE KEYS FROM A DIRECTORY ##########
+def encrypt_message(a_message):
+    a_message = a_message.encode('utf-8')
+    publickey = RSA.import_key(open(CERTS_DIR +'/bil_send.crt', 'r').read())
+    #print(publickey, ".... public key")
+    encryptor = PKCS1_OAEP.new(publickey)
+    #print(encryptor, ".....encryptor......")
+    encrypted5_msg = encryptor.encrypt(a_message)
+    encoded_encrypted_msg = base64.b64encode(encrypted5_msg)
+    return encoded_encrypted_msg.decode('utf-8') 
+
+def convert_currency(amount, from_currency, to_currency, at_time=None):
+    if from_currency == to_currency:
+        return Decimal(amount)
+
+    at_time = at_time or now()
+
+    rate = ExchangeRate.objects.filter(
+        base_currency=from_currency,
+        target_currency=to_currency,
+        valid_from__lte=at_time
+    ).filter(
+        models.Q(valid_to__gte=at_time) | models.Q(valid_to__isnull=True)
+    ).latest("valid_from")
+
+    return Decimal(amount) * rate.rate

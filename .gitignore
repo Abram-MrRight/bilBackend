@@ -18,3 +18,9 @@ media/
 
 # OS
 .DS_Store
+
+logs/
+certs
+
+#custom files
+important_commands.txt

@@ -76,9 +76,6 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
-
-
-
 class ProofSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
@@ -104,12 +101,46 @@ class ProofSerializer(serializers.ModelSerializer):
 class ProofStatusUpdateSerializer(serializers.ModelSerializer):
     charge_rule = serializers.PrimaryKeyRelatedField(
         queryset=ChargeRule.objects.all(),
-        required=False, allow_null=True
+        required=False, 
+        allow_null=True
+    )
+    
+    # Add this field to help with debugging
+    charge_rule_id = serializers.IntegerField(
+        source='charge_rule.id',
+        read_only=True
     )
 
     class Meta:
         model = Proof
-        fields = ['status', 'status_note', 'charge_rule']
+        fields = ['status', 'status_note', 'charge_rule', 'charge_rule_id']
+        read_only_fields = ['charge_rule_id']
+    
+    def validate_status(self, value):
+        valid_statuses = ['pending', 'verified', 'money_delivered', 'rejected']
+        if value not in valid_statuses:
+            raise serializers.ValidationError(f"Status must be one of: {', '.join(valid_statuses)}")
+        return value
+    
+    def to_representation(self, instance):
+        # Return charge_rule as ID in the response
+        representation = super().to_representation(instance)
+        if instance.charge_rule:
+            representation['charge_rule'] = instance.charge_rule.id
+        return representation
+    
+    def to_internal_value(self, data):
+        # Make sure charge_rule is treated as ID
+        internal_value = super().to_internal_value(data)
+        
+        # If charge_rule is a dict (object), extract the ID
+        if 'charge_rule' in internal_value and isinstance(internal_value['charge_rule'], dict):
+            try:
+                internal_value['charge_rule'] = internal_value['charge_rule'].get('id')
+            except:
+                internal_value['charge_rule'] = None
+        
+        return internal_value
 
 
 class ProofReadSerializer(serializers.ModelSerializer):

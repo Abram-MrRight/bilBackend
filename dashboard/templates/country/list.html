@@ -9,7 +9,7 @@
     <thead class="table-success">
         <tr>
             <th>Name</th>
-            <th>Code</th>
+            {% comment %} <th>Code</th> {% endcomment %}
             <th>Created By</th>
             <th>Actions</th>
         </tr>
@@ -18,7 +18,7 @@
     {% for country in countries %}
         <tr>
             <td>{{ country.name }}</td>
-            <td>{{ country.code }}</td>
+            {% comment %} <td>{{ country.code }}</td> {% endcomment %}
             <td>
                 {% if country.created_by %}
                     {{ country.created_by.fullname }}

@@ -9,7 +9,7 @@
 <div class="container-fluid analytics-container">
 
     <!-- ===== HEADER WITH PERIOD FILTER ===== -->
-    <div class="executive-analytics-header">
+    <div class="">
         <div class="row align-items-center">
             <div class="col-lg-8">
                 <h1 class="fw-bold mb-2">Multi-Currency Analytics</h1>
@@ -226,91 +226,6 @@
                 </div>
                 <div class="chart-wrapper">
                     <canvas id="valueDistributionChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== DETAILED CURRENCY TABLE ===== -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="chart-container-premium">
-                <div class="chart-header">
-                    <h5><i class="bi bi-table me-2"></i> Detailed Currency Analysis</h5>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle analytics-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Currency</th>
-                                <th class="text-end">Transactions</th>
-                                <th class="text-end">Total Sent</th>
-                                <th class="text-end">In {{ base_currency }}</th>
-                                <th class="text-end">Charges</th>
-                                <th class="text-end">Charge Rate</th>
-                                <th class="text-end">Avg. Value</th>
-                                <th class="text-end">Contribution</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stat in currency_stats %}
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="currency-dot me-2" style="background: {{ stat.color }};"></div>
-                                        <div>
-                                            <strong>{{ stat.currency }}</strong>
-                                            <div class="small text-muted">{{ stat.currency_name }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="text-end">{{ stat.count|intcomma }}</td>
-                                <td class="text-end">
-                                    {{ stat.total_amount|floatformat:0|intcomma }} {{ stat.currency }}
-                                </td>
-                                <td class="text-end fw-bold text-success">
-                                    {{ stat.base_amount|floatformat:0|intcomma }}
-                                </td>
-                                <td class="text-end {% if stat.charge_rate > 5 %}text-danger{% endif %}">
-                                    {{ stat.total_charge|floatformat:0|intcomma }}
-                                </td>
-                                <td class="text-end">
-                                    <span class="badge {% if stat.charge_rate > 5 %}bg-danger{% elif stat.charge_rate > 2 %}bg-warning{% else %}bg-success{% endif %}">
-                                        {{ stat.charge_rate|floatformat:2 }}%
-                                    </span>
-                                </td>
-                                <td class="text-end">{{ stat.avg_amount|floatformat:0|intcomma }}</td>
-                                <td class="text-end">
-                                    <div class="progress-thin">
-                                        <div class="progress-thin-bar" 
-                                             style="width: {{ stat.percentage }}%;
-                                                    background: {{ stat.color }};">
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">{{ stat.percentage|floatformat:1 }}%</small>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot class="table-active">
-                            <tr class="fw-semibold">
-                                <th>TOTAL</th>
-                                <th class="text-end">{{ total_transactions|intcomma }}</th>
-                                <th class="text-end">—</th>
-                                <th class="text-end text-primary">{{ total_amount_base|floatformat:0|intcomma }}</th>
-                                <th class="text-end text-danger">{{ total_charges_base|floatformat:0|intcomma }}</th>
-                                <th class="text-end">{{ overall_charge_rate|floatformat:2 }}%</th>
-                                <th class="text-end">
-                                    {% if total_transactions > 0 %}
-                                        {{ total_amount_base|floatformat:0|intdivide:total_transactions|intcomma }}
-                                    {% else %}
-                                        0
-                                    {% endif %}
-                                </th>
-                                <th class="text-end">100%</th>
-                            </tr>
-                        </tfoot>
-                    </table>
                 </div>
             </div>
         </div>

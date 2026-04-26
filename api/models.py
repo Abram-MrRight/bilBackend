@@ -1,9 +1,10 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import BaseUserManager
 from django.utils import timezone
 from django.conf import settings
-
+from django.db.models import Q
 
 
 # Base model with timestamps
@@ -281,35 +282,85 @@ class Transaction(models.Model):
     original_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True) 
     ugx_equivalent = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     exchange_rate_used = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
-    
-    # Add method to calculate UGX equivalent
+
+    # Currency Conversion Logic
+
     def save(self, *args, **kwargs):
-        if not self.ugx_equivalent and self.original_amount and self.original_currency:
+        ugx_currency = Currency.objects.get(code="UGX")
+
+        # Ensure original_amount is set
+        if not self.original_amount:
+            self.original_amount = self.amount
+
+        # Compute UGX equivalent
+        if self.original_currency == "UGX":
+            self.ugx_equivalent = self.original_amount
+            self.exchange_rate_used = Decimal("1.0")
+        else:
             try:
-                if self.original_currency == 'UGX':
-                    self.ugx_equivalent = self.original_amount
-                else:
-                    rate = ExchangeRate.objects.filter(
-                        currency=self.original_currency
-                    ).latest('updated_at')
-                    self.ugx_equivalent = self.original_amount * rate.rate_to_ugx
-                    self.exchange_rate_used = rate.rate_to_ugx
+                base_currency_obj = Currency.objects.get(code=self.original_currency)
+                rate = ExchangeRate.objects.filter(
+                    base_currency=base_currency_obj,
+                    target_currency=ugx_currency,
+                    valid_from__lte=timezone.now()
+                ).filter(
+                    Q(valid_to__gte=timezone.now()) | Q(valid_to__isnull=True)
+                ).latest("valid_from")
+
+                self.exchange_rate_used = rate.rate
+                self.ugx_equivalent = self.original_amount * rate.rate
+            except Currency.DoesNotExist:
+                # fallback if currency not found
+                self.exchange_rate_used = Decimal("1.0")
+                self.ugx_equivalent = self.original_amount
             except ExchangeRate.DoesNotExist:
-                self.ugx_equivalent = self.original_amount  # Fallback
+                # fallback if no exchange rate is found
+                self.exchange_rate_used = Decimal("1.0")
+                self.ugx_equivalent = self.original_amount
+
+        # Net amount after charges
+        self.net_amount = self.original_amount - self.charge_amount
+
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Transaction #{self.transaction_reference} - {self.amount} {self.currency}"
     
-
 class ExchangeRate(models.Model):
-    country = models.ForeignKey(Country, on_delete=models.CASCADE)  # added FK
-    currency = models.CharField(max_length=10, unique=True)
-    rate_to_ugx = models.DecimalField(max_digits=20, decimal_places=4)
-    updated_at = models.DateTimeField(auto_now=True)
+    base_currency = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name="base_exchange_rates"
+    )
+    target_currency = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name="target_exchange_rates"
+    )
+    rate = models.DecimalField(
+        max_digits=20,
+        decimal_places=6
+    )
+    source = models.CharField(
+        max_length=50,
+        help_text="e.g. Bank of Uganda, MTN, Forex API"
+    )
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["base_currency", "target_currency", "valid_from"],
+                name="unique_rate_per_period"
+            )
+        ]
+        ordering = ["-valid_from"]
 
     def __str__(self):
-        return f"{self.currency} → {self.rate_to_ugx} UGX"
+        return f"{self.base_currency.code} → {self.target_currency.code} = {self.rate}"
+
     
 class Announcement(models.Model):
     title = models.CharField(max_length=255)
