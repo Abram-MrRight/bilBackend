@@ -21,7 +21,7 @@ SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-3x%pek=)69b)*e5vv
 DEBUG = env.bool('DEBUG', default=False)
 
 # ALLOWED_HOSTS - Use environment variable or default
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'] if DEBUG else [])
+ALLOWED_HOSTS = [host.strip() for host in env("ALLOWED_HOSTS", default="").split(",") if host.strip()]
 
 # Extra security for production (only if DEBUG=False)
 if not DEBUG:
