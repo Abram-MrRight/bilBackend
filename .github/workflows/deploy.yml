@@ -93,7 +93,7 @@ jobs:
             else
               echo "🔄 Updating existing repository..."
               git fetch origin
-              git reset --hard origin/main
+              git reset --hard origin/develop
             fi
 
             # Virtual environment
