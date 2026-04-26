@@ -8,19 +8,6 @@
 
 <div class="proofs-container">
 
-    <!-- Header -->
-    <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h4 class="fw-bold mb-1">Proofs Management</h4>
-                <p class="mb-0 opacity-90">View all money transfer proofs</p>
-            </div>
-            <span class="badge bg-light text-dark">
-                <i class="bi bi-clock me-1"></i> {% now "H:i" %}
-            </span>
-        </div>
-    </div>
-
     <!-- Stats -->
     <div class="stats-row">
         <div class="stat-box">
@@ -79,7 +66,6 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Date</th>
                         <th>Image</th>
                         <th>Sender</th>
@@ -92,7 +78,6 @@
                 <tbody id="proofs-table-body">
                     {% for p in proofs %}
                     <tr>
-                        <td class="fw-bold">#{{ p.id }}</td>
                         <td>
                             <div class="small">{{ p.created_at|date:"M d" }}</div>
                             <div class="text-muted" style="font-size: 0.75rem;">{{ p.created_at|time:"H:i" }}</div>

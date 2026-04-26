@@ -8,24 +8,6 @@
 
 <div class="container-fluid dashboard-container py-4">
 
-    <!-- ===== EXECUTIVE HEADER ===== -->
-    <div class="executive-header">
-        <div class="row align-items-center">
-            <div class="col-lg-8">
-                <h1 class="fw-bold mb-2">Executive Dashboard</h1>
-                <p class="lead opacity-85 mb-0">Real-time insights and analytics for bilSend platform management</p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                <div class="bg-white bg-opacity-10 backdrop-blur rounded-pill d-inline-flex align-items-center px-4 py-2">
-                    <i class="bi bi-clock me-2"></i>
-                    <span id="currentTime">{{ now|time:"H:i" }}</span>
-                    <span class="mx-2 opacity-50">•</span>
-                    <span>{{ now|date:"l, j F Y" }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- ===== KPI METRICS ===== -->
     <div class="row g-4 mb-5 scroll-reveal">
         <div class="col-xl-3 col-md-6">
@@ -177,7 +159,7 @@
                                     <th style="width: 50px;">#</th>
                                     <th>Client</th>
                                     <th>Contact</th>
-                                    <th class="text-end">Proofs</th>
+                                    <th class="text-end">Transactions</th>
                                     <th class="text-end">Status</th>
                                 </tr>
                             </thead>
@@ -197,11 +179,11 @@
                                         </div>
                                     </td>
                                     <td>{{ c.phone_number|default:"-" }}</td>
-                                    <td class="text-end fw-bold">{{ c.proofs_count }}</td>
+                                    <td class="text-end fw-bold">{{ c.transactions_count }}</td>
                                     <td class="text-end">
-                                        {% if c.proofs_count > 20 %}
+                                        {% if c.transactions_count > 20 %}
                                         <span class="badge-tier badge-vip">VIP</span>
-                                        {% elif c.proofs_count > 10 %}
+                                        {% elif c.transactions_count > 10 %}
                                         <span class="badge-tier badge-active">Active</span>
                                         {% else %}
                                         <span class="badge-tier badge-new">New</span>

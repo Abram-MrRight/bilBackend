@@ -24,6 +24,7 @@ from django.apps import apps
 from django.forms import modelform_factory
 from django.contrib import messages
 from datetime import datetime
+from api.utils import convert_currency
 from dashboard.forms import AgentForm, AnnouncementForm, ChargeRuleForm, CompanyInfoForm, CountryForm, CurrencyForm, ProfileForm, UploadProofStepForm, UserDetailForm, UserEditForm, UserRegistrationForm, WhatsAppContactForm
 # views.py
 import datetime
@@ -73,14 +74,19 @@ def get_file_size(file_field):
             return 0
     return 0
 
+import random
+
+def random_color():
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
 @staff_member_required
 def system_status(request):
-    # --- CPU ---
+    #  CPU 
     cpu_percent = psutil.cpu_percent(interval=1)
     cpu_high = cpu_percent > 80
     cpu_warning = 60 < cpu_percent <= 80
 
-    # --- RAM ---
+    #  RAM 
     mem = psutil.virtual_memory()
     ram_total = round(mem.total / (1024 ** 3), 2)
     ram_used = round(mem.used / (1024 ** 3), 2)
@@ -88,7 +94,7 @@ def system_status(request):
     ram_high = ram_percent > 80
     ram_warning = 60 < ram_percent <= 80
 
-    # --- Disk ---
+    #  Disk 
     disk = shutil.disk_usage('/')
     disk_total = round(disk.total / (1024 ** 3), 2)
     disk_used = round(disk.used / (1024 ** 3), 2)
@@ -96,7 +102,7 @@ def system_status(request):
     disk_high = disk_percent > 80
     disk_warning = 60 < disk_percent <= 80
 
-    # --- Swap ---
+    #  Swap 
     swap = psutil.swap_memory()
     swap_total = round(swap.total / (1024 ** 3), 2)
     swap_used = round(swap.used / (1024 ** 3), 2)
@@ -104,7 +110,7 @@ def system_status(request):
     swap_high = swap_percent > 80
     swap_warning = 60 < swap_percent <= 80
 
-    # --- Old Data (>3 months) ---
+    #  Old Data (>3 months) 
     three_months_ago = timezone.now() - timedelta(days=90)
 
     old_proofs = Proof.objects.filter(created_at__lt=three_months_ago)
@@ -194,13 +200,16 @@ def format_money(amount, decimals=4):
     amount = Decimal(amount).quantize(Decimal(f"1.{'0'*decimals}"), rounding=ROUND_HALF_UP)
     return f"{amount:,.{decimals}f}"
 def analytics_dashboard(request):
-    # Get base currency from settings or use UGX as default
-    base_currency = getattr(settings, 'BASE_CURRENCY', 'UGX')
     
-    # Get date range filter
-    date_filter = request.GET.get('period', 'all')
+    # BASE SETUP
+    
+    base_currency_code = getattr(settings, 'BASE_CURRENCY', 'UGX')
+    base_currency = Currency.objects.get(code=base_currency_code)
+
     now = timezone.now()
-    
+    date_filter = request.GET.get('period', 'all')
+
+    start_date = None
     if date_filter == 'today':
         start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif date_filter == 'week':
@@ -209,156 +218,97 @@ def analytics_dashboard(request):
         start_date = now - timedelta(days=30)
     elif date_filter == 'year':
         start_date = now - timedelta(days=365)
-    else:
-        start_date = None
-    
-    # Filter transactions based on date range
+
     transactions = Transaction.objects.all()
     if start_date:
         transactions = transactions.filter(confirmed_at__gte=start_date)
+
     
-    # Get current USD to UGX exchange rate
-    try:
-        usd_rate_obj = ExchangeRate.objects.filter(currency='USD').latest('updated_at')
-        exchange_rate = Decimal(str(usd_rate_obj.rate_to_ugx))  # Ensure Decimal
-    except ExchangeRate.DoesNotExist:
-        exchange_rate = Decimal('3800')  # Default fallback
+    # GLOBAL TOTALS (BASE CURRENCY)
     
-    # ===== USD TRANSACTIONS =====
-    usd_transactions = transactions.filter(original_currency='USD')
-    usd_count = usd_transactions.count()
-    
-    # USD amounts (in USD) - convert to Decimal
-    usd_total_amount = Decimal(str(usd_transactions.aggregate(
-        total=Sum('original_amount')
-    )['total'] or Decimal('0')))
-    
-    usd_total_charge = Decimal(str(usd_transactions.aggregate(
-        total=Sum('charge_amount')
-    )['total'] or Decimal('0')))
-    
-    usd_total_net = usd_total_amount - usd_total_charge
-    
-    # Convert USD to UGX
-    usd_amount_ugx = usd_total_amount * exchange_rate
-    usd_charge_ugx = usd_total_charge * exchange_rate
-    usd_net_ugx = usd_total_net * exchange_rate
-    
-    # USD averages
-    usd_stats_agg = usd_transactions.aggregate(
-        avg_amount=Avg('original_amount'),
-        avg_charge=Avg('charge_amount')
+    total_amount_base = Decimal(str(
+        transactions.aggregate(total=Sum('ugx_equivalent'))['total'] or 0
+    ))
+
+    total_charges_base = Decimal(str(
+        transactions.aggregate(total=Sum('charge_amount'))['total'] or 0
+    ))
+
+    total_net_base = total_amount_base - total_charges_base
+
+    overall_charge_rate = (
+        (total_charges_base / total_amount_base) * Decimal('100')
+        if total_amount_base > 0 else Decimal('0')
     )
-    usd_avg_amount = Decimal(str(usd_stats_agg['avg_amount'] or Decimal('0')))
-    usd_avg_charge = Decimal(str(usd_stats_agg['avg_charge'] or Decimal('0')))
+
+    # PER-CURRENCY STATISTICS
     
-    # ===== UGX TRANSACTIONS =====
-    ugx_transactions = transactions.filter(original_currency='UGX')
-    ugx_count = ugx_transactions.count()
-    
-    # UGX amounts (already in UGX) - convert to Decimal
-    ugx_total_amount = Decimal(str(ugx_transactions.aggregate(
-        total=Sum('original_amount')
-    )['total'] or Decimal('0')))
-    
-    ugx_total_charge = Decimal(str(ugx_transactions.aggregate(
-        total=Sum('charge_amount')
-    )['total'] or Decimal('0')))
-    
-    ugx_total_net = ugx_total_amount - ugx_total_charge
-    
-    # UGX averages
-    ugx_stats_agg = ugx_transactions.aggregate(
-        avg_amount=Avg('original_amount'),
-        avg_charge=Avg('charge_amount')
-    )
-    ugx_avg_amount = Decimal(str(ugx_stats_agg['avg_amount'] or Decimal('0')))
-    ugx_avg_charge = Decimal(str(ugx_stats_agg['avg_charge'] or Decimal('0')))
-    
-    # ===== TOTALS IN UGX =====
-    total_amount_ugx = usd_amount_ugx + ugx_total_amount
-    total_charges_ugx = usd_charge_ugx + ugx_total_charge
-    total_net = total_amount_ugx - total_charges_ugx
-    
-    # ===== CHARGE RATES =====
-    # USD charge rate - ensure both are Decimal
-    usd_charge_rate = Decimal('0')
-    if usd_total_amount > Decimal('0'):
-        usd_charge_rate = (usd_total_charge / usd_total_amount) * Decimal('100')
-    
-    # UGX charge rate - ensure both are Decimal
-    ugx_charge_rate = Decimal('0')
-    if ugx_total_amount > Decimal('0'):
-        ugx_charge_rate = (ugx_total_charge / ugx_total_amount) * Decimal('100')
-    
-    # Overall charge rate
-    overall_charge_rate = Decimal('0')
-    if total_amount_ugx > Decimal('0'):
-        overall_charge_rate = (total_charges_ugx / total_amount_ugx) * Decimal('100')
-    
-    # ===== CURRENCY STATS FOR DYNAMIC DISPLAY =====
     currency_stats = []
-    
-    # Add USD stats
-    if usd_count > 0:
+
+    for currency in Currency.objects.all():
+        txs = transactions.filter(original_currency=currency)
+        if not txs.exists():
+            continue
+
+        total_original = Decimal(str(
+            txs.aggregate(total=Sum('original_amount'))['total'] or 0
+        ))
+
+        total_charge = Decimal(str(
+            txs.aggregate(total=Sum('charge_amount'))['total'] or 0
+        ))
+
+        total_base = Decimal(str(
+            txs.aggregate(total=Sum('ugx_equivalent'))['total'] or 0
+        ))
+
+        avg_amount = Decimal(str(
+            txs.aggregate(avg=Avg('original_amount'))['avg'] or 0
+        ))
+
+        avg_charge = Decimal(str(
+            txs.aggregate(avg=Avg('charge_amount'))['avg'] or 0
+        ))
+
+        charge_rate = (
+            (total_charge / total_original) * Decimal('100')
+            if total_original > 0 else Decimal('0')
+        )
+
+        percentage = (
+            (total_base / total_amount_base) * Decimal('100')
+            if total_amount_base > 0 else Decimal('0')
+        )
+
+         # SAFE exchange rate lookup
+        try:
+            exchange_rate = convert_currency(1, currency, base_currency)
+        except ExchangeRate.DoesNotExist:
+            exchange_rate = Decimal('0')
+
         currency_stats.append({
-            'currency': 'USD',
-            'country_name': 'United States',
-            'currency_name': 'US Dollar',
-            'color': '#0052B4',
-            'symbol': '$',
-            'count': usd_count,
-            'total_amount': float(usd_total_amount),
-            'total_charge': float(usd_total_charge),
-            'total_net': float(usd_total_net),
-            'avg_amount': float(usd_avg_amount),
-            'avg_charge': float(usd_avg_charge),
-            'exchange_rate': float(exchange_rate),
-            'base_amount': float(usd_amount_ugx),
-            'base_charge': float(usd_charge_ugx),
-            'charge_rate': float(usd_charge_rate),
+            'currency': currency.code,
+            'currency_name': currency.name,
+            'symbol': currency.symbol,
+            'count': txs.count(),
+            'total_amount': float(total_original),
+            'total_charge': float(total_charge),
+            'total_net': float(total_original - total_charge),
+            'avg_amount': float(avg_amount),
+            'avg_charge': float(avg_charge),
+            'base_amount': float(total_base),
+            'charge_rate': float(charge_rate),
+            'percentage': float(percentage),
+            'color': random_color(),
+            'exchange_rate': exchange_rate,
         })
+
     
-    # Add UGX stats
-    if ugx_count > 0:
-        currency_stats.append({
-            'currency': 'UGX',
-            'country_name': 'Uganda',
-            'currency_name': 'Ugandan Shilling',
-            'color': '#FCDC04',
-            'symbol': 'UGX',
-            'count': ugx_count,
-            'total_amount': float(ugx_total_amount),
-            'total_charge': float(ugx_total_charge),
-            'total_net': float(ugx_total_net),
-            'avg_amount': float(ugx_avg_amount),
-            'avg_charge': float(ugx_avg_charge),
-            'exchange_rate': 1.0,  # UGX to UGX rate is 1
-            'base_amount': float(ugx_total_amount),
-            'base_charge': float(ugx_total_charge),
-            'charge_rate': float(ugx_charge_rate),
-        })
+    # TOP STAFF PERFORMANCE
     
-    # Calculate percentages for currency contribution
-    for stat in currency_stats:
-        if total_amount_ugx > Decimal('0'):
-            stat['percentage'] = float((Decimal(str(stat['base_amount'])) / total_amount_ugx) * Decimal('100'))
-        else:
-            stat['percentage'] = 0.0
-    
-    # ===== NEW VARIABLES FOR THE NEW TEMPLATE =====
-    # Calculate base currency totals (using UGX as base)
-    total_amount_base = total_amount_ugx
-    total_charges_base = total_charges_ugx
-    total_net_base = total_net
-    
-    # Calculate net to total ratio
-    net_to_total_ratio = Decimal('0')
-    if total_amount_base > Decimal('0'):
-        net_to_total_ratio = (total_net_base / total_amount_base) * Decimal('100')
-    
-    # Get top performing staff
-    top_staff = transactions.values(
+    top_staff = transactions.exclude(
+        confirmed_by__isnull=True
+    ).values(
         'confirmed_by__fullname',
         'confirmed_by__email'
     ).annotate(
@@ -367,111 +317,83 @@ def analytics_dashboard(request):
         total_charge=Sum('charge_amount'),
         avg_amount=Avg('ugx_equivalent')
     ).order_by('-total_amount')[:5]
+
     
-    # Get transaction trend (last 7 days)
+    # TRANSACTION TREND (LAST 7 DAYS)
+    
     trend_data = []
     for i in range(6, -1, -1):
-        date = now - timedelta(days=i)
-        day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
-        
-        day_transactions = transactions.filter(confirmed_at__range=(day_start, day_end))
-        day_count = day_transactions.count()
-        day_amount = day_transactions.aggregate(total=Sum('ugx_equivalent'))['total'] or Decimal('0')
-        
+        day = now - timedelta(days=i)
+        day_total = transactions.filter(
+            confirmed_at__date=day.date()
+        ).aggregate(
+            total=Sum('ugx_equivalent')
+        )['total'] or Decimal('0')
+
         trend_data.append({
-            'date': date.strftime('%a'),
-            'count': day_count,
-            'amount': float(day_amount),
+            'date': day.strftime('%a'),
+            'amount': float(day_total),
         })
+
     
-    # Get active countries
+    # ADDITIONAL METRICS
+    
     active_countries = Country.objects.filter(
-        id__in=transactions.exclude(country__isnull=True).values_list('country', flat=True).distinct()
+        id__in=transactions.exclude(
+            country__isnull=True
+        ).values_list('country', flat=True).distinct()
     )
-    
-    # Calculate average transaction value and charge
+
     total_transactions = transactions.count()
+
+    avg_amount = Decimal(str(
+        transactions.aggregate(avg=Avg('ugx_equivalent'))['avg'] or 0
+    ))
+
+    avg_charge = Decimal(str(
+        transactions.aggregate(avg=Avg('charge_amount'))['avg'] or 0
+    ))
+
     
-    # Get averages as Decimal
-    avg_amount_agg = transactions.aggregate(avg=Avg('ugx_equivalent'))
-    avg_charge_agg = transactions.aggregate(avg=Avg('charge_amount'))
-    
-    avg_amount = Decimal(str(avg_amount_agg['avg'] or Decimal('0')))
-    avg_charge = Decimal(str(avg_charge_agg['avg'] or Decimal('0')))
+    # CONTEXT
     
     context = {
-        # NEW VARIABLES FOR THE NEW TEMPLATE
+        # Base totals
+        'base_currency': base_currency.code,
         'total_amount_base': total_amount_base,
         'total_charges_base': total_charges_base,
         'total_net_base': total_net_base,
         'overall_charge_rate': overall_charge_rate,
-        'net_to_total_ratio': net_to_total_ratio,
-        'base_currency': base_currency,
-        
-        # Basic counts
+
+        # Counts
         'total_transactions': total_transactions,
-        'usd_count': usd_count,
-        'ugx_count': ugx_count,
-        
-        # USD amounts (in USD)
-        'usd_total_amount': usd_total_amount,
-        'usd_total_charge': usd_total_charge,
-        'usd_total_net': usd_total_net,
-        
-        # UGX amounts (in UGX)
-        'ugx_total_amount': ugx_total_amount,
-        'ugx_total_charge': ugx_total_charge,
-        'ugx_total_net': ugx_total_net,
-        
-        # Exchange rate and conversions
-        'exchange_rate': exchange_rate,
-        'usd_amount_ugx': usd_amount_ugx,
-        'usd_charge_ugx': usd_charge_ugx,
-        'usd_net_ugx': usd_net_ugx,
-        
-        # Totals in UGX
-        'total_amount_ugx': total_amount_ugx,
-        'total_charges_ugx': total_charges_ugx,
-        'total_net': total_net,
-        
-        # Statistics
-        'usd_stats': {
-            'avg_amount': usd_avg_amount,
-            'avg_charge': usd_avg_charge,
-        },
-        'ugx_stats': {
-            'avg_amount': ugx_avg_amount,
-            'avg_charge': ugx_avg_charge,
-        },
-        
-        # Charge rates
-        'charge_rate': overall_charge_rate,
-        'usd_charge_rate': usd_charge_rate,
-        'ugx_charge_rate': ugx_charge_rate,
-        
-        # For dynamic display
-        'currency_stats': currency_stats,
         'currency_count': len(currency_stats),
         'country_count': active_countries.count(),
-        'staff_count': transactions.exclude(confirmed_by__isnull=True).values('confirmed_by').distinct().count(),
-        
-        # Additional metrics for template
+        'staff_count': transactions.exclude(
+            confirmed_by__isnull=True
+        ).values('confirmed_by').distinct().count(),
+
+        # Currency analytics
+        'currency_stats': currency_stats,
+
+        # Staff & trends
         'top_staff': top_staff,
         'trend_data': json.dumps(trend_data),
+
+        # Reference data
         'active_countries': active_countries,
-        'period': date_filter,
-        'exchange_rates': ExchangeRate.objects.all().order_by('currency'),
+        'exchange_rates': ExchangeRate.objects.all().order_by('created_at'),
         'all_currencies': Currency.objects.all(),
-        'last_update': now,
-        
-        # For summary stats
+
+        # Averages
         'avg_amount': avg_amount,
         'avg_charge': avg_charge,
-        'total_amount': total_amount_ugx,  # For charge rate calculation in template
-        'total_charge': total_charges_ugx,  # For charge rate calculation in template
+
+        # UI
+        'period': date_filter,
+        'last_update': now,
     }
-    
+
     return render(request, 'dashboard/analytics.html', context)
 
 def get_color_for_currency(currency_code):
@@ -646,45 +568,64 @@ def delete_charge_rule(request, pk):
     return redirect('charge_rule_list')
 
 def exchange_rate_add(request):
-    countries = Country.objects.all()
-    currencies = Currency.objects.all()  # or filter dynamically via AJAX
+    currencies = Currency.objects.all()
 
     if request.method == "POST":
-        country_id = request.POST.get("country")
-        currency_id = request.POST.get("currency")
-        rate_to_ugx = request.POST.get("rate_to_ugx")
+        base_currency_id = request.POST.get("base_currency")
+        target_currency_id = request.POST.get("target_currency")
+        rate = request.POST.get("rate")
+        source = request.POST.get("source", "manual")
+        valid_from = request.POST.get("valid_from")
 
-        # Validation
-        if not country_id or not currency_id or not rate_to_ugx:
+       
+        # VALIDATION
+       
+        if not all([base_currency_id, target_currency_id, rate, valid_from]):
             messages.error(request, "All fields are required.")
             return redirect("exchange_rate_add")
 
+        if base_currency_id == target_currency_id:
+            messages.error(request, "Base and target currency cannot be the same.")
+            return redirect("exchange_rate_add")
+
         try:
-            country = Country.objects.get(id=int(country_id))
-            currency = Currency.objects.get(id=int(currency_id))
-            rate_to_ugx = float(rate_to_ugx)
-        except (ValueError, Country.DoesNotExist, Currency.DoesNotExist):
+            base_currency = Currency.objects.get(id=int(base_currency_id))
+            target_currency = Currency.objects.get(id=int(target_currency_id))
+            rate = Decimal(rate)
+            valid_from = timezone.datetime.fromisoformat(valid_from)
+        except Exception:
             messages.error(request, "Invalid input data.")
             return redirect("exchange_rate_add")
 
-        # Prevent duplicates
-        if ExchangeRate.objects.filter(country=country, currency=currency).exists():
-            messages.error(request, "Exchange rate for this country/currency already exists.")
-            return redirect("exchange_rate_add")
+       
+        # CLOSE PREVIOUS ACTIVE RATE
+       
+        ExchangeRate.objects.filter(
+            base_currency=base_currency,
+            target_currency=target_currency,
+            valid_to__isnull=True
+        ).update(valid_to=timezone.now())
 
-        # Save
+       
+        # CREATE NEW RATE
+       
         ExchangeRate.objects.create(
-            country=country,
-            currency=currency,
-            rate_to_ugx=rate_to_ugx
+            base_currency=base_currency,
+            target_currency=target_currency,
+            rate=rate,
+            source=source,
+            valid_from=valid_from
         )
-        messages.success(request, "Exchange rate added successfully.")
+
+        messages.success(
+            request,
+            f"Exchange rate {base_currency.code} → {target_currency.code} added successfully."
+        )
         return redirect("exchange_rate_list")
 
     return render(request, "exchange_rate/exchange_rate_form.html", {
-        "countries": countries,
         "currencies": currencies,
-        "action": "Add"
+        "action": "Add",
     })
 
 
@@ -704,8 +645,8 @@ def admin_dashboard(request):
     # Top 5 active clients
     top_clients = (
         User.objects.filter(role='client')
-        .annotate(proofs_count=Count('proofs'))
-        .order_by('-proofs_count')[:5]
+        .annotate(transactions_count=Count('transactions'))
+        .order_by('-transactions_count')[:5]
     )
 
     # Weekly submissions (past 7 days)
@@ -1033,14 +974,14 @@ def agents_list(request):
     data = Agent.objects.all()
     return render(request, 'dashboard/agents.html', {'agents': data})
 
-# --- List Agents ---
+#  List Agents 
 @csrf_protect
 @login_required(login_url='admin_login')
 def agents_list(request):
     agents = Agent.objects.all()
     return render(request, 'agents/agents.html', {'agents': agents, 'page_title': 'Agents'})
 
-# --- Add Agent ---
+#  Add Agent 
 @csrf_protect
 @login_required(login_url='admin_login')
 def add_agent(request):
@@ -1051,7 +992,7 @@ def add_agent(request):
         return redirect('agents')
     return render(request, 'agents/agent_form.html', {'form': form, 'title': 'Add Agent'})
 
-# --- Edit Agent ---
+#  Edit Agent 
 @csrf_protect
 @login_required(login_url='admin_login')
 def edit_agent(request, pk):
@@ -1063,7 +1004,7 @@ def edit_agent(request, pk):
         return redirect('agents')
     return render(request, 'agents/agent_form.html', {'form': form, 'title': 'Edit Agent'})
 
-# --- Delete Agent ---
+#  Delete Agent 
 @csrf_protect
 @login_required(login_url='admin_login')
 def delete_agent(request, pk):
@@ -1168,174 +1109,120 @@ def transaction_receipt(request, id):
 
 
 def transactions(request):
-    # Base queryset with all related data
+    #  Base queryset 
     transactions_qs = Transaction.objects.select_related(
-        'confirmed_by',
-        'charge_rule',
-        'charge_rule__country',
-        'proof'
-    ).all().order_by('-confirmed_at')
+        'confirmed_by', 'charge_rule', 'charge_rule__country', 'proof'
+      ).all().order_by('-confirmed_at')
 
-    #CALCULATE GLOBAL STATISTICS BY CURRENCY (before filtering)
-    # USD transactions
-    usd_transactions = transactions_qs.filter(currency='USD')
-    ugx_transactions = transactions_qs.filter(currency='UGX')
-    
-    # USD Statistics
-    usd_stats = usd_transactions.aggregate(
-        total_count=Count('id'),
-        total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-        total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-        total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-        avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-        avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-    )
-    
-    # UGX Statistics
-    ugx_stats = ugx_transactions.aggregate(
-        total_count=Count('id'),
-        total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-        total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-        total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-        avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-        avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-    )
-    
-    # Combined statistics (for backward compatibility)
-    global_stats = transactions_qs.aggregate(
-        total_count=Count('id'),
-        total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-        total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-        total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-        avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-        avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-        staff_count=Count('confirmed_by', distinct=True),
-        currency_count=Count('currency', distinct=True),
-        country_count=Count('charge_rule__country', distinct=True),
-    )
-    
-    # Assuming you have an ExchangeRate model with fields: currency, rate_to_ugx, updated_at
-    try:
-        exchange_rate = ExchangeRate.objects.filter(currency='USD').first()
-        usd_to_ugx_rate = exchange_rate.rate_to_ugx if exchange_rate else Decimal('3800.00')
-    except:
-        usd_to_ugx_rate = Decimal('3800.00')  # Default rate
+    #  Base currency for reporting 
+    base_currency = Currency.objects.get(code='UGX')
 
-    # Calculate UGX equivalent for USD transactions
-    usd_amount_ugx = (usd_stats['total_amount'] or Decimal('0.00')) * usd_to_ugx_rate
-    usd_charge_ugx = (usd_stats['total_charge'] or Decimal('0.00')) * usd_to_ugx_rate
-    
-    # Calculate totals in UGX
-    total_amount_ugx = (ugx_stats['total_amount'] or Decimal('0.00')) + usd_amount_ugx
-    total_charges_ugx = (ugx_stats['total_charge'] or Decimal('0.00')) + usd_charge_ugx
+    #  Calculate global stats dynamically for all currencies 
+    total_amount_base = Decimal('0.00')
+    total_charge_base = Decimal('0.00')
 
-    # Calculate by currency (for stats display)
-    currency_stats = transactions_qs.values('currency').annotate(
-        count=Count('id'),
-        total_amount=Sum('amount'),
-        total_charge=Sum('charge_amount'),
-        total_net=Sum('net_amount')
-    ).order_by('-total_amount')
+    # Compute base currency equivalent per transaction
+    tx_base_amounts = []
+    for tx in transactions_qs:
+        try:
+            base_currency_obj = Currency.objects.get(code=tx.currency)
+            rate_obj = ExchangeRate.objects.filter(
+                base_currency=base_currency_obj,
+                target_currency=base_currency,
+                valid_from__lte=timezone.now()
+            ).filter(Q(valid_to__gte=timezone.now()) | Q(valid_to__isnull=True)
+            ).latest('valid_from')
+            rate = rate_obj.rate
+        except (Currency.DoesNotExist, ExchangeRate.DoesNotExist):
+            rate = Decimal('1.00')
 
-    #  APPLY FILTERS 
+        amount_base = tx.amount * rate
+        charge_base = tx.charge_amount * rate
+        total_amount_base += amount_base
+        total_charge_base += charge_base
+
+        tx_base_amounts.append({
+            'tx': tx,
+            'amount_base': amount_base,
+            'charge_base': charge_base
+        })
+
+        total_amount_base += tx.amount * rate
+        total_charge_base += tx.charge_amount * rate
+
+    total_net_base = total_amount_base - total_charge_base
+
+    #  Filter form values 
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     sender = request.GET.get('sender', '').strip()
     receiver = request.GET.get('receiver', '').strip()
-    currency = request.GET.get('currency', '').strip()
+    currency_code = request.GET.get('currency', '').strip()
     confirmed_by = request.GET.get('confirmed_by', '').strip()
     status_filter = request.GET.get('status', '').strip()
 
     filters = Q()
-
     if date_from:
-        transactions_qs = transactions_qs.filter(confirmed_at__date__gte=date_from)
         filters &= Q(confirmed_at__date__gte=date_from)
     if date_to:
-        transactions_qs = transactions_qs.filter(confirmed_at__date__lte=date_to)
         filters &= Q(confirmed_at__date__lte=date_to)
     if sender:
-        transactions_qs = transactions_qs.filter(sender_name__icontains=sender)
         filters &= Q(sender_name__icontains=sender)
     if receiver:
-        transactions_qs = transactions_qs.filter(receiver_name__icontains=receiver)
         filters &= Q(receiver_name__icontains=receiver)
-    if currency:
-        transactions_qs = transactions_qs.filter(currency__iexact=currency)
-        filters &= Q(currency__iexact=currency)
+    if currency_code:
+        filters &= Q(currency__code__iexact=currency_code)
     if confirmed_by:
-        transactions_qs = transactions_qs.filter(confirmed_by__fullname__icontains=confirmed_by)
         filters &= Q(confirmed_by__fullname__icontains=confirmed_by)
     if status_filter:
         if status_filter == 'completed':
-            transactions_qs = transactions_qs.filter(is_completed=True)
             filters &= Q(is_completed=True)
         elif status_filter == 'pending':
-            transactions_qs = transactions_qs.filter(is_completed=False)
             filters &= Q(is_completed=False)
 
-    # Filtered USD transactions
-    filtered_usd_transactions = transactions_qs.filter(currency='USD')
-    filtered_ugx_transactions = transactions_qs.filter(currency='UGX')
-    
-    filtered_usd_stats = filtered_usd_transactions.aggregate(
-        total_count=Count('id'),
-        total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-        total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-        total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-    )
-    
-    filtered_ugx_stats = filtered_ugx_transactions.aggregate(
-        total_count=Count('id'),
-        total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-        total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-        total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-    )
-    
-    # Calculate filtered UGX equivalents
-    filtered_usd_amount_ugx = (filtered_usd_stats['total_amount'] or Decimal('0.00')) * usd_to_ugx_rate
-    filtered_usd_charge_ugx = (filtered_usd_stats['total_charge'] or Decimal('0.00')) * usd_to_ugx_rate
-    
-    filtered_total_amount_ugx = (filtered_ugx_stats['total_amount'] or Decimal('0.00')) + filtered_usd_amount_ugx
-    filtered_total_charges_ugx = (filtered_ugx_stats['total_charge'] or Decimal('0.00')) + filtered_usd_charge_ugx
+    filtered_qs = transactions_qs.filter(filters)
 
-    # Combined filtered stats
-    filtered_stats = transactions_qs.aggregate(
-        filtered_count=Count('id'),
-        filtered_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-        filtered_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-        filtered_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-        avg_filtered_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-    )
+    #  Filtered totals in base currency 
+    filtered_total_amount_base = Decimal('0.00')
+    filtered_total_charge_base = Decimal('0.00')
+    for tx in filtered_qs:
+        rate_obj = ExchangeRate.objects.filter(
+        base_currency__code=tx.currency,
+        target_currency__code=base_currency
+        ).order_by('-created_at').first()
+        rate = Decimal(str(rate_obj.rate)) if rate_obj else Decimal('1.00')
+        filtered_total_amount_base += tx.amount * rate
+        filtered_total_charge_base += tx.charge_amount * rate
+    filtered_total_net_base = filtered_total_amount_base - filtered_total_charge_base
 
-    # Top staff by transaction count
-    top_staff = transactions_qs.values(
-        'confirmed_by__id', 
-        'confirmed_by__fullname', 
+    #  Aggregate filtered stats by currency 
+    currency_stats = filtered_qs.values('currency').annotate(
+        count=Count('id'),
+        total_amount=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField()),
+        total_charge=Coalesce(Sum('charge_amount'), Decimal('0.00'), output_field=DecimalField()),
+        total_net=Coalesce(Sum(F('amount') - F('charge_amount')), Decimal('0.00'), output_field=DecimalField())
+    ).order_by('-total_amount')
+
+    #  Top staff 
+    top_staff = filtered_qs.values(
+        'confirmed_by__id',
+        'confirmed_by__fullname',
         'confirmed_by__email'
     ).annotate(
         transaction_count=Count('id'),
-        total_amount=Sum('amount'),
-        total_charge=Sum('charge_amount')
-    ).order_by('-transaction_count')[:5]
-
-    # Top currencies by amount
-    top_currencies = transactions_qs.values('currency').annotate(
-        transaction_count=Count('id'),
-        total_amount=Sum('amount')
+        total_amount=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField()),
+        total_charge=Coalesce(Sum('charge_amount'), Decimal('0.00'), output_field=DecimalField())
     ).order_by('-total_amount')[:5]
 
-    #  DOWNLOAD 
-    download_format = request.GET.get('download_format')
-    if download_format == 'excel':
-        return download_transactions_excel(transactions_qs)
-    elif download_format == 'pdf':
-        return download_transactions_pdf(transactions_qs)
+    # Top currencies
+    top_currencies = filtered_qs.values('currency').annotate(
+        transaction_count=Count('id'),
+        total_amount=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField())
+    ).order_by('-total_amount')[:5]
 
-    #  PAGINATION 
-    paginator = Paginator(transactions_qs, 10)
+    #  Pagination 
+    paginator = Paginator(filtered_qs, 10)
     page_number = request.GET.get("page")
-    
     try:
         page_obj = paginator.get_page(page_number)
     except PageNotAnInteger:
@@ -1343,96 +1230,44 @@ def transactions(request):
     except EmptyPage:
         page_obj = paginator.get_page(paginator.num_pages)
 
-    # Clean querystring (remove page=)
-    params = request.GET.copy()
-    if 'page' in params:
-        params.pop('page')
+    #  Download options 
+    download_format = request.GET.get('download_format')
+    if download_format == 'excel':
+        return download_transactions_excel(filtered_qs)
+    elif download_format == 'pdf':
+        return download_transactions_pdf(filtered_qs)
 
-    #  AJAX LIVE SEARCH 
+    #  AJAX Live Search 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return render(request, 'transactions/transactions_table.html', {
             'transactions': page_obj,
-            'page_obj': page_obj,
+            'page_obj': page_obj
         })
 
-    #  RENDER FULL PAGE 
+    #  Render page 
     context = {
         'transactions': page_obj,
         'page_obj': page_obj,
-        'clean_query': params.urlencode(),
-        
-        # Exchange rate for conversions
-        'exchange_rate': usd_to_ugx_rate,
-        
-        # USD Statistics
-        'usd_total_amount': usd_stats['total_amount'] or Decimal('0.00'),
-        'usd_total_charge': usd_stats['total_charge'] or Decimal('0.00'),
-        'usd_total_net': usd_stats['total_net'] or Decimal('0.00'),
-        'usd_count': usd_stats['total_count'] or 0,
-        
-        # UGX Statistics
-        'ugx_total_amount': ugx_stats['total_amount'] or Decimal('0.00'),
-        'ugx_total_charge': ugx_stats['total_charge'] or Decimal('0.00'),
-        'ugx_total_net': ugx_stats['total_net'] or Decimal('0.00'),
-        'ugx_count': ugx_stats['total_count'] or 0,
-        
-        # Converted amounts
-        'usd_amount_ugx': usd_amount_ugx,
-        'usd_charge_ugx': usd_charge_ugx,
-        'total_amount_ugx': total_amount_ugx,
-        'total_charges_ugx': total_charges_ugx,
-        
-        # Filtered USD Statistics
-        'filtered_usd_total_amount': filtered_usd_stats['total_amount'] or Decimal('0.00'),
-        'filtered_usd_total_charge': filtered_usd_stats['total_charge'] or Decimal('0.00'),
-        'filtered_usd_count': filtered_usd_stats['total_count'] or 0,
-        
-        # Filtered UGX Statistics
-        'filtered_ugx_total_amount': filtered_ugx_stats['total_amount'] or Decimal('0.00'),
-        'filtered_ugx_total_charge': filtered_ugx_stats['total_charge'] or Decimal('0.00'),
-        'filtered_ugx_count': filtered_ugx_stats['total_count'] or 0,
-        
-        # Filtered converted amounts
-        'filtered_usd_amount_ugx': filtered_usd_amount_ugx,
-        'filtered_usd_charge_ugx': filtered_usd_charge_ugx,
-        'filtered_total_amount_ugx': filtered_total_amount_ugx,
-        'filtered_total_charges_ugx': filtered_total_charges_ugx,
-        
-        # Global statistics (combined)
-        'total_transactions': global_stats['total_count'],
-        'total_amount': global_stats['total_amount'],
-        'total_charge': global_stats['total_charge'],
-        'total_net': global_stats['total_net'],
-        'avg_amount': global_stats['avg_amount'],
-        'avg_charge': global_stats['avg_charge'],
-        'staff_count': global_stats['staff_count'],
-        'currency_count': global_stats['currency_count'],
-        'country_count': global_stats['country_count'],
-        
-        # Filtered statistics (combined)
-        'filtered_count': filtered_stats['filtered_count'],
-        'filtered_amount': filtered_stats['filtered_amount'],
-        'filtered_charge': filtered_stats['filtered_charge'],
-        'filtered_net': filtered_stats['filtered_net'],
-        'avg_filtered_amount': filtered_stats['avg_filtered_amount'],
-        
-        # Leaderboards
+        'currency_stats': currency_stats,
         'top_staff': top_staff,
         'top_currencies': top_currencies,
-        'currency_stats': currency_stats[:5],
-        
-        # Filter values for form persistence
+        'total_amount_base': total_amount_base,
+        'total_charge_base': total_charge_base,
+        'total_net_base': total_net_base,
+        'filtered_total_amount_base': filtered_total_amount_base,
+        'filtered_total_charge_base': filtered_total_charge_base,
+        'filtered_total_net_base': filtered_total_net_base,
+        # Form persistence
         'date_from': date_from,
         'date_to': date_to,
         'sender': sender,
         'receiver': receiver,
-        'currency': currency,
+        'currency': currency_code,
         'confirmed_by': confirmed_by,
         'status_filter': status_filter,
-        
         'title': 'Transactions Management',
     }
-    
+
     return render(request, 'transactions/transactions.html', context)
 
 @login_required(login_url='admin_login')
@@ -1529,41 +1364,78 @@ def download_transactions_pdf(transactions):
     )
 
 
-
 def exchange_rate_list(request):
-    rates = ExchangeRate.objects.all().order_by('currency')
+    """List all exchange rates with optional reverse FX calculation."""
 
-    # compute reverse FX
+    # Use the correct fields: base_currency and target_currency
+    rates = ExchangeRate.objects.select_related('base_currency', 'target_currency').all().order_by('base_currency__code')
+
+    # Compute reverse FX (for display purposes)
     for rate in rates:
-        if rate.currency != "UGX":
-            rate.reverse_fx = 1 / float(rate.rate_to_ugx)
+        if rate.target_currency.code != "UGX":
+            try:
+                rate.reverse_fx = round(1 / float(rate.rate), 6)
+            except ZeroDivisionError:
+                rate.reverse_fx = None
         else:
             rate.reverse_fx = None
 
-    context = {"rates": rates}
+    context = {
+        "rates": rates,
+        "title": "Exchange Rates List"
+    }
     return render(request, "exchange_rate/exchange_rate_list.html", context)
 
 
 def exchange_rate_edit(request, id):
+    """Edit an existing exchange rate."""
     rate_obj = get_object_or_404(ExchangeRate, id=id)
+    currencies = Currency.objects.all()
+    countries = Country.objects.all()
 
     if request.method == "POST":
-        rate_obj.currency = request.POST.get("currency").upper().strip()
-        rate_obj.rate_to_ugx = request.POST.get("rate")
+        currency_id = request.POST.get("currency")
+        country_id = request.POST.get("country")
+        rate_to_ugx = request.POST.get("rate")
+
+        # Validation
+        if not currency_id or not rate_to_ugx:
+            messages.error(request, "Currency and rate are required.")
+            return redirect("exchange_rate_edit", id=id)
+
+        try:
+            currency = Currency.objects.get(id=int(currency_id))
+            country = Country.objects.get(id=int(country_id)) if country_id else None
+            rate_to_ugx = float(rate_to_ugx)
+        except (ValueError, Currency.DoesNotExist, Country.DoesNotExist):
+            messages.error(request, "Invalid input.")
+            return redirect("exchange_rate_edit", id=id)
+
+        # Update
+        rate_obj.currency = currency
+        rate_obj.country = country
+        rate_obj.rate_to_ugx = rate_to_ugx
         rate_obj.save()
 
         messages.success(request, "Exchange rate updated successfully.")
         return redirect("exchange_rate_list")
 
-    return render(request, "exchange_rate/exchange_rate_form.html", {"action": "Edit", "rate": rate_obj})
+    context = {
+        "action": "Edit",
+        "rate": rate_obj,
+        "currencies": currencies,
+        "countries": countries,
+        "title": "Edit Exchange Rate"
+    }
+    return render(request, "exchange_rate/exchange_rate_form.html", context)
 
 
 def exchange_rate_delete(request, id):
+    """Delete an exchange rate."""
     rate_obj = get_object_or_404(ExchangeRate, id=id)
     rate_obj.delete()
     messages.success(request, "Exchange rate deleted successfully.")
     return redirect("exchange_rate_list")
-
 # List
 @csrf_protect
 @login_required(login_url='admin_login')

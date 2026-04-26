@@ -2,7 +2,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    
     path('auth/register/', views.register, name='register'),
     path('auth/login/', views.login, name='login'),
     path('auth/logout/', views.logout, name='logout'),
@@ -36,5 +35,6 @@ urlpatterns = [
     path('get_whatsapp_contact/', views.get_whatsapp_contact, name='get_whatsapp_contact_detail'),
 
     path('transactions/', views.get_user_transactions, name='user-transactions'),
+    path('encrypt_message', views.EncryptMessageView.as_view(), name='encrypt_message'),
 
 ]
