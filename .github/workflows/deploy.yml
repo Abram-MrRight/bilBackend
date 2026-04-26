@@ -72,13 +72,29 @@ jobs:
 
             # Clone or update repo
             if [ ! -d ".git" ]; then
-              echo "📥 Cloning repository..."
-              git clone https://github.com/Abram-MrRight/bilBackend.git .
-            fi
+              echo "📥 First-time setup (preserving .env)..."
 
-            echo "🔄 Pulling latest code..."
-            git fetch origin
-            git reset --hard origin/develop
+              # Temporarily move .env out
+              if [ -f ".env" ]; then
+                mv .env /tmp/bilBackend.env
+              fi
+
+              # Clean directory safely
+              rm -rf * .[^.]* 2>/dev/null || true
+
+              # Clone repo
+              git clone https://github.com/Abram-MrRight/bilBackend.git .
+
+              # Restore .env
+              if [ -f "/tmp/bilBackend.env" ]; then
+                mv /tmp/bilBackend.env .env
+              fi
+
+            else
+              echo "🔄 Updating existing repository..."
+              git fetch origin
+              git reset --hard origin/main
+            fi
 
             # Virtual environment
             if [ ! -d "venv" ]; then
