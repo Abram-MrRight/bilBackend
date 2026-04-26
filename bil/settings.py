@@ -6,40 +6,42 @@ from decouple import config
 
 # Initialize environ
 env = environ.Env()
-environ.Env.read_env()
+
+# Build paths first (before using BASE_DIR)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# OR if you want to specify the .env file path:
+# Read .env file with proper path
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-# SECURITY WARNING: keep the secret key used in production secret! 
-SECRET_KEY = 'django-insecure-3x%pek=)69b)*e5vvq4x8hp_@!4+8(=8#_+v9zrg6lndze*&7v'
-# SECURITY
+# SECURITY WARNING: keep the secret key used in production secret!
+# Use environment variable for secret key in production
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-3x%pek=)69b)*e5vvq4x8hp_@!4+8(=8#_+v9zrg6lndze*&7v')
+
+# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# ALLOWED_HOSTS - Use environment variable or default
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'] if DEBUG else [])
 
-# Session security
-SESSION_COOKIE_AGE = 60 * 30        # 30 minutes
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_SAVE_EVERY_REQUEST = True
-
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True 
-CSRF_COOKIE_SECURE = True
-
-# Prevent JS access
-CSRF_COOKIE_HTTPONLY = True
-LOGIN_ATTEMPTS_LIMIT = 5
-
-# ALLOWED_HOSTS = ['localhost', '10.10.76.75', '127.0.0.1', '10.0.2.2']
-ALLOWED_HOSTS = ['*']
-#python manage.py runserver 0.0.0.0:8000
+# Extra security for production (only if DEBUG=False)
+if not DEBUG:
+    # Session security
+    SESSION_COOKIE_AGE = 60 * 30        # 30 minutes
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+    SESSION_SAVE_EVERY_REQUEST = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = True 
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    LOGIN_ATTEMPTS_LIMIT = 5
+else:
+    # Development settings
+    SESSION_COOKIE_AGE = 60 * 30
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+    SESSION_SAVE_EVERY_REQUEST = True
+    LOGIN_ATTEMPTS_LIMIT = 5
 
 # Application definition
-
 INSTALLED_APPS = [
     'jazzmin',
     'django.contrib.admin',
@@ -86,34 +88,29 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'bil.wsgi.application'
 
+# Choose database type based on environment variable
+DATABASE_TYPE = env('DATABASE_TYPE', default='sqlite')
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-# DATABASE
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-# If you want to use PostgreSQL, uncomment this and comment the above
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'bilbackend_db'),
-        'USER': os.getenv('DB_USER', 'bilbackend_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+if DATABASE_TYPE == 'postgresql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('DB_NAME', default='bilbackend_db'),
+            'USER': env('DB_USER', default='bilbackend_user'),
+            'PASSWORD': env('DB_PASSWORD', default=''),
+            'HOST': env('DB_HOST', default='localhost'),
+            'PORT': env('DB_PORT', default='5432'),
+        }
     }
-}
-
+else:  # Default to SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -129,67 +126,70 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
 }
 
+# JWT settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), 
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(env('JWT_ACCESS_MINUTES', default=60))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(env('JWT_REFRESH_DAYS', default=1))),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 AUTH_USER_MODEL = 'api.User'
 
-
-
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For production
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
-MEDIA_URL = '/media/'  # URL to access media files
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media') 
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGIN_URL = '/login/'       
-LOGIN_REDIRECT_URL = '/' 
+# Login URLs
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
 
-
-# EMAIL
+# Email settings with fallbacks for CI/testing
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = env('EMAIL_HOST')
-EMAIL_PORT = env.int('EMAIL_PORT')
-EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS')
-EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL')
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 
-# FRONTEND
+# Only use SMTP if credentials are provided, otherwise use console for development
+if env('EMAIL_HOST_USER', default='') and env('EMAIL_HOST_PASSWORD', default=''):
+    EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+    EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+    EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL', default=False)
+    EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+    DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
+else:
+    # Use console backend for development/testing
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Frontend URL
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:8000')
 
-
-# LOGGING
+# Logging
 LOG_BASE_DIR = env('LOG_BASE_DIR', default=os.path.join(BASE_DIR, 'logs'))
 if not os.path.exists(LOG_BASE_DIR):
     os.makedirs(LOG_BASE_DIR, exist_ok=True)
@@ -197,60 +197,85 @@ if not os.path.exists(LOG_BASE_DIR):
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
             'filename': os.path.join(LOG_BASE_DIR, 'app.log'),
+            'formatter': 'verbose',
         },
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
     },
     'loggers': {
         'django': {
             'handlers': ['file', 'console'],
             'level': 'INFO',
+            'propagate': True,
+        },
+        'api': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': True,
         },
     },
 }
 
 # Jazzmin settings
 JAZZMIN_SETTINGS = {
-    "site_title": "My Admin",
-    "site_header": "Dashboard",
-    "site_brand": "MyBrand",
-    "site_icon": None,  # you can put "/static/img/logo.png" if you have one
-
-    # Top menu links (optional)
+    "site_title": "BilSend Admin",
+    "site_header": "BilSend Dashboard",
+    "site_brand": "BilSend",
+    "site_icon": None,
+    "welcome_sign": "Welcome to BilSend Admin",
+    "copyright": "BilSend",
+    "search_model": ["api.User", "api.Transaction"],
     "topmenu_links": [
         {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "Dashboard", "url": "/dashboard/", "new_window": True},
     ],
-
-    # Hide apps you don’t need in the sidebar
     "hide_apps": [
-        "authtoken",            
-        "token_blacklist",     
+        "authtoken",
+        "token_blacklist",
     ],
-
-    # Hide specific models if needed
     "hide_models": [
         "contenttypes.contenttype",
+        "sessions.session",
     ],
-
-    # Order apps in the sidebar
     "order_with_respect_to": [
-        "dashboard",           
-        "api",                 
+        "dashboard",
+        "api",
+        "api.Transaction",
+        "api.User",
+        "api.Proof",
     ],
-
-    # Icons for apps and models (optional)
     "icons": {
         "dashboard": "fas fa-tachometer-alt",
         "api": "fas fa-cogs",
+        "api.User": "fas fa-users",
+        "api.Transaction": "fas fa-exchange-alt",
+        "api.Proof": "fas fa-image",
+        "auth.Group": "fas fa-users",
     },
-
-    # Default list display behavior
-    "show_ui_builder": True,
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    "show_ui_builder": False,
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {"auth.user": "collapsible", "auth.group": "vertical_tabs"},
 }
 
+# Custom admin site configuration for the terminator admin
+# This ensures only superusers can access the main admin
+ADMIN_URL = 'terminator/'
