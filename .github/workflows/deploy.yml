@@ -3,7 +3,7 @@ name: Deploy bilBackend to Server
 on:
   push:
     branches:
-      - main
+      - develop
 
 jobs:
   build:
@@ -78,7 +78,7 @@ jobs:
 
             echo "🔄 Pulling latest code..."
             git fetch origin
-            git reset --hard origin/main
+            git reset --hard origin/develop
 
             # Virtual environment
             if [ ! -d "venv" ]; then
