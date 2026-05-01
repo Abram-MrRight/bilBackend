@@ -1,9 +1,10 @@
+import os
 from pyexpat.errors import messages
 import uuid
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from api.models import Agent, ChargeRule, CompanyInfo, Country, Currency, ExchangeRate, Proof, Transaction, UploadProofStep, User, WhatsAppContact
+from api.models import Agent, Announcement, ChargeRule, CompanyInfo, Country, Currency, ExchangeRate, Proof, Transaction, UploadProofStep, User, WhatsAppContact
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -23,7 +24,7 @@ from django.apps import apps
 from django.forms import modelform_factory
 from django.contrib import messages
 from datetime import datetime
-from dashboard.forms import AgentForm, ChargeRuleForm, CompanyInfoForm, CountryForm, CurrencyForm, ProfileForm, UploadProofStepForm, UserDetailForm, UserEditForm, UserRegistrationForm, WhatsAppContactForm
+from dashboard.forms import AgentForm, AnnouncementForm, ChargeRuleForm, CompanyInfoForm, CountryForm, CurrencyForm, ProfileForm, UploadProofStepForm, UserDetailForm, UserEditForm, UserRegistrationForm, WhatsAppContactForm
 # views.py
 import datetime
 import io
@@ -48,7 +49,7 @@ import json
 
 from api.models import Transaction, ExchangeRate
 from decimal import Decimal
-
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 
 from decimal import Decimal, ROUND_HALF_UP
@@ -57,6 +58,136 @@ from django.db.models import Avg, F, Q
 from decimal import Decimal
 from collections import defaultdict
 from django.conf import settings 
+
+import shutil
+import psutil
+from django.shortcuts import render
+from datetime import datetime, timedelta
+
+def get_file_size(file_field):
+    """Return file size in MB, 0 if no file."""
+    if file_field and file_field.name:
+        try:
+            return os.path.getsize(file_field.path) / (1024 ** 2) 
+        except:
+            return 0
+    return 0
+
+@staff_member_required
+def system_status(request):
+    # --- CPU ---
+    cpu_percent = psutil.cpu_percent(interval=1)
+    cpu_high = cpu_percent > 80
+    cpu_warning = 60 < cpu_percent <= 80
+
+    # --- RAM ---
+    mem = psutil.virtual_memory()
+    ram_total = round(mem.total / (1024 ** 3), 2)
+    ram_used = round(mem.used / (1024 ** 3), 2)
+    ram_percent = mem.percent
+    ram_high = ram_percent > 80
+    ram_warning = 60 < ram_percent <= 80
+
+    # --- Disk ---
+    disk = shutil.disk_usage('/')
+    disk_total = round(disk.total / (1024 ** 3), 2)
+    disk_used = round(disk.used / (1024 ** 3), 2)
+    disk_percent = round(disk.used / disk.total * 100, 2)
+    disk_high = disk_percent > 80
+    disk_warning = 60 < disk_percent <= 80
+
+    # --- Swap ---
+    swap = psutil.swap_memory()
+    swap_total = round(swap.total / (1024 ** 3), 2)
+    swap_used = round(swap.used / (1024 ** 3), 2)
+    swap_percent = swap.percent
+    swap_high = swap_percent > 80
+    swap_warning = 60 < swap_percent <= 80
+
+    # --- Old Data (>3 months) ---
+    three_months_ago = timezone.now() - timedelta(days=90)
+
+    old_proofs = Proof.objects.filter(created_at__lt=three_months_ago)
+    old_transactions = Transaction.objects.filter(confirmed_at__lt=three_months_ago)
+    old_announcements = Announcement.objects.filter(created_at__lt=three_months_ago)
+
+    def get_files_size(queryset, file_field):
+        total_bytes = 0
+        for obj in queryset:
+            file = getattr(obj, file_field, None)
+            if file and os.path.exists(file.path):
+                total_bytes += os.path.getsize(file.path)
+        return round(total_bytes / (1024 * 1024), 2)  # in MB
+
+    context = {
+        'cpu_percent': cpu_percent,
+        'cpu_high': cpu_high,
+        'cpu_warning': cpu_warning,
+        'ram_total': ram_total,
+        'ram_used': ram_used,
+        'ram_percent': ram_percent,
+        'ram_high': ram_high,
+        'ram_warning': ram_warning,
+        'disk_total': disk_total,
+        'disk_used': disk_used,
+        'disk_percent': disk_percent,
+        'disk_high': disk_high,
+        'disk_warning': disk_warning,
+        'swap_total': swap_total,
+        'swap_used': swap_used,
+        'swap_percent': swap_percent,
+        'swap_high': swap_high,
+        'swap_warning': swap_warning,
+        'old_proofs_count': old_proofs.count(),
+        'old_proofs_size': get_files_size(old_proofs, 'image'),
+        'old_transactions_count': old_transactions.count(),
+        'old_transactions_size': get_files_size(old_transactions, 'receipt_file'),
+        'old_announcements_count': old_announcements.count(),
+        'old_announcements_size': get_files_size(old_announcements, 'image'),
+    }
+    return render(request, 'system_monitoring/system_status.html', context)
+
+
+def delete_old_data(request):
+    """Delete all old files (Proofs, Transactions, Announcements) older than 3 months"""
+    three_months_ago = datetime.now() - timedelta(days=90)
+    
+    # Delete old proofs
+    old_proofs = Proof.objects.filter(created_at__lt=three_months_ago)
+    proofs_count = old_proofs.count()
+    for proof in old_proofs:
+        if proof.image:
+            try:
+                os.remove(proof.image.path)
+            except:
+                pass
+    old_proofs.delete()
+
+    # Delete old transactions
+    old_transactions = Transaction.objects.filter(confirmed_at__lt=three_months_ago)
+    transactions_count = old_transactions.count()
+    for txn in old_transactions:
+        if txn.receipt_file:
+            try:
+                os.remove(txn.receipt_file.path)
+            except:
+                pass
+    old_transactions.delete()
+
+    # Delete old announcements
+    old_announcements = Announcement.objects.filter(created_at__lt=three_months_ago)
+    announcements_count = old_announcements.count()
+    for ann in old_announcements:
+        if ann.image:
+            try:
+                os.remove(ann.image.path)
+            except:
+                pass
+    old_announcements.delete()
+
+    messages.success(request, f"{proofs_count} old proof(s), {transactions_count} old transaction(s), "
+                              f"and {announcements_count} old announcement(s) deleted successfully.")
+    return redirect('system_status')
 
 def format_money(amount, decimals=4):
     """Format Decimal or float to string with commas and fixed decimals."""
@@ -215,7 +346,17 @@ def analytics_dashboard(request):
         else:
             stat['percentage'] = 0.0
     
-    # ===== OTHER METRICS =====
+    # ===== NEW VARIABLES FOR THE NEW TEMPLATE =====
+    # Calculate base currency totals (using UGX as base)
+    total_amount_base = total_amount_ugx
+    total_charges_base = total_charges_ugx
+    total_net_base = total_net
+    
+    # Calculate net to total ratio
+    net_to_total_ratio = Decimal('0')
+    if total_amount_base > Decimal('0'):
+        net_to_total_ratio = (total_net_base / total_amount_base) * Decimal('100')
+    
     # Get top performing staff
     top_staff = transactions.values(
         'confirmed_by__fullname',
@@ -259,12 +400,15 @@ def analytics_dashboard(request):
     avg_amount = Decimal(str(avg_amount_agg['avg'] or Decimal('0')))
     avg_charge = Decimal(str(avg_charge_agg['avg'] or Decimal('0')))
     
-    # Most active currency
-    most_active_currency = None
-    if currency_stats:
-        most_active_currency = max(currency_stats, key=lambda x: x['count'])
-    
     context = {
+        # NEW VARIABLES FOR THE NEW TEMPLATE
+        'total_amount_base': total_amount_base,
+        'total_charges_base': total_charges_base,
+        'total_net_base': total_net_base,
+        'overall_charge_rate': overall_charge_rate,
+        'net_to_total_ratio': net_to_total_ratio,
+        'base_currency': base_currency,
+        
         # Basic counts
         'total_transactions': total_transactions,
         'usd_count': usd_count,
@@ -326,9 +470,6 @@ def analytics_dashboard(request):
         'avg_charge': avg_charge,
         'total_amount': total_amount_ugx,  # For charge rate calculation in template
         'total_charge': total_charges_ugx,  # For charge rate calculation in template
-        
-        # For most active currency display
-        'top_currencies': currency_stats,
     }
     
     return render(request, 'dashboard/analytics.html', context)
@@ -367,149 +508,14 @@ def currency_management(request):
     }
     
     return render(request, 'dashboard/analytics.html', context)
-# def analytics_dashboard(request):
-#     # Base queryset with all related data
-#     transactions_qs = Transaction.objects.select_related(
-#         'confirmed_by',
-#         'charge_rule',
-#         'charge_rule__country',
-#         'proof'
-#     ).all()
-    
-#     # Get exchange rate for conversion
-#     try:
-#         exchange_rate = ExchangeRate.objects.filter(currency='USD').first()
-#         usd_to_ugx_rate = exchange_rate.rate_to_ugx if exchange_rate else Decimal('3800.00')
-#     except:
-#         usd_to_ugx_rate = Decimal('3800.00')  # Default rate
-    
-#     # USD transactions
-#     usd_transactions = transactions_qs.filter(currency='USD')
-#     ugx_transactions = transactions_qs.filter(currency='UGX')
-    
-#     # USD Statistics
-#     usd_stats = usd_transactions.aggregate(
-#         total_count=Count('id'),
-#         total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-#         total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-#         total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-#         avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-#         avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-#     )
-    
-#     # UGX Statistics
-#     ugx_stats = ugx_transactions.aggregate(
-#         total_count=Count('id'),
-#         total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-#         total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-#         total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-#         avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-#         avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-#     )
-    
-#     # Calculate UGX equivalent for USD transactions
-#     usd_amount_ugx = (usd_stats['total_amount'] or Decimal('0.00')) * usd_to_ugx_rate
-#     usd_charge_ugx = (usd_stats['total_charge'] or Decimal('0.00')) * usd_to_ugx_rate
-    
-#     # Calculate totals in UGX
-#     total_amount_ugx = (ugx_stats['total_amount'] or Decimal('0.00')) + usd_amount_ugx
-#     total_charges_ugx = (ugx_stats['total_charge'] or Decimal('0.00')) + usd_charge_ugx
-    
-#     # Combined statistics
-#     global_stats = transactions_qs.aggregate(
-#         total_count=Count('id'),
-#         total_amount=Coalesce(Sum('amount'), 0.0, output_field=DecimalField()),
-#         total_charge=Coalesce(Sum('charge_amount'), 0.0, output_field=DecimalField()),
-#         total_net=Coalesce(Sum('net_amount'), 0.0, output_field=DecimalField()),
-#         avg_amount=Coalesce(Avg('amount'), 0.0, output_field=DecimalField()),
-#         avg_charge=Coalesce(Avg('charge_amount'), 0.0, output_field=DecimalField()),
-#         staff_count=Count('confirmed_by', distinct=True),
-#         currency_count=Count('currency', distinct=True),
-#         country_count=Count('charge_rule__country', distinct=True),
-#     )
-    
-#     # Calculate by currency (for stats display)
-#     currency_stats = transactions_qs.values('currency').annotate(
-#         count=Count('id'),
-#         total_amount=Sum('amount'),
-#         total_charge=Sum('charge_amount'),
-#         total_net=Sum('net_amount')
-#     ).order_by('-total_amount')
-    
-#     # Top staff by transaction count
-#     top_staff = transactions_qs.values(
-#         'confirmed_by__id', 
-#         'confirmed_by__fullname'
-#     ).annotate(
-#         transaction_count=Count('id'),
-#         total_amount=Sum('amount'),
-#         total_charge=Sum('charge_amount')
-#     ).order_by('-transaction_count')[:5]
-    
-#     # Top currencies by amount
-#     top_currencies = transactions_qs.values('currency').annotate(
-#         transaction_count=Count('id'),
-#         total_amount=Sum('amount')
-#     ).order_by('-total_amount')[:5]
-    
-#     # Calculate charge rate percentage
-#     charge_rate = 0
-#     if global_stats['total_amount'] and global_stats['total_amount'] > 0:
-#         charge_rate = (global_stats['total_charge'] / global_stats['total_amount']) * 100
-    
-#     context = {
-#         # Exchange rate
-#         'exchange_rate': usd_to_ugx_rate,
-        
-#         # USD Statistics
-#         'usd_total_amount': usd_stats['total_amount'] or Decimal('0.00'),
-#         'usd_total_charge': usd_stats['total_charge'] or Decimal('0.00'),
-#         'usd_total_net': usd_stats['total_net'] or Decimal('0.00'),
-#         'usd_count': usd_stats['total_count'] or 0,
-#         'usd_stats': usd_stats,
-        
-#         # UGX Statistics
-#         'ugx_total_amount': ugx_stats['total_amount'] or Decimal('0.00'),
-#         'ugx_total_charge': ugx_stats['total_charge'] or Decimal('0.00'),
-#         'ugx_total_net': ugx_stats['total_net'] or Decimal('0.00'),
-#         'ugx_count': ugx_stats['total_count'] or 0,
-#         'ugx_stats': ugx_stats,
-        
-#         # Converted amounts
-#         'usd_amount_ugx': usd_amount_ugx,
-#         'usd_charge_ugx': usd_charge_ugx,
-#         'total_amount_ugx': total_amount_ugx,
-#         'total_charges_ugx': total_charges_ugx,
-        
-#         # Global statistics
-#         'total_transactions': global_stats['total_count'],
-#         'total_amount': global_stats['total_amount'],
-#         'total_charge': global_stats['total_charge'],
-#         'total_net': global_stats['total_net'],
-#         'avg_amount': global_stats['avg_amount'],
-#         'avg_charge': global_stats['avg_charge'],
-#         'staff_count': global_stats['staff_count'],
-#         'currency_count': global_stats['currency_count'],
-#         'country_count': global_stats['country_count'],
-#         'charge_rate': charge_rate,
-        
-#         # Leaderboards
-#         'top_staff': top_staff,
-#         'top_currencies': list(top_currencies),
-#         'currency_stats': list(currency_stats),
-        
-#         'title': 'Financial Analytics Dashboard',
-#     }
-    
-#     return render(request, 'dashboard/analytics.html', context)
 
 
-@login_required
+@login_required(login_url='admin_login')
 def country_list(request):
     countries = Country.objects.all()
     return render(request, 'country/list.html', {'countries': countries})
 
-@login_required
+@login_required(login_url='admin_login')
 def add_country(request):
     if request.method == 'POST':
         form = CountryForm(request.POST)
@@ -523,7 +529,7 @@ def add_country(request):
         form = CountryForm()
     return render(request, 'country/add.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def edit_country(request, pk):
     country = get_object_or_404(Country, pk=pk)
@@ -537,7 +543,7 @@ def edit_country(request, pk):
         form = CountryForm(instance=country)
     return render(request, 'country/edit.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def delete_country(request, pk):
     country = get_object_or_404(Country, pk=pk)
@@ -546,13 +552,13 @@ def delete_country(request, pk):
     return redirect('country_list')
 
 #  CURRENCY VIEWS 
-@login_required
+@login_required(login_url='admin_login')
 
 def currency_list(request):
     currencies = Currency.objects.select_related('country').all()
     return render(request, 'currency/list.html', {'currencies': currencies})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def add_currency(request):
     if request.method == 'POST':
@@ -565,7 +571,7 @@ def add_currency(request):
         form = CurrencyForm()
     return render(request, 'currency/add.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def edit_currency(request, pk):
     currency = get_object_or_404(Currency, pk=pk)
@@ -579,7 +585,7 @@ def edit_currency(request, pk):
         form = CurrencyForm(instance=currency)
     return render(request, 'currency/edit.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def delete_currency(request, pk):
     currency = get_object_or_404(Currency, pk=pk)
@@ -594,13 +600,13 @@ def get_currencies(request, country_id):
 
 
 #  CHARGERULE VIEWS 
-@login_required
+@login_required(login_url='admin_login')
 
 def charge_rule_list(request):
     rules = ChargeRule.objects.select_related('country', 'currency').all()
     return render(request, 'charge_rule/list.html', {'rules': rules})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def add_charge_rule(request):
     if request.method == 'POST':
@@ -615,7 +621,7 @@ def add_charge_rule(request):
         form = ChargeRuleForm()
     return render(request, 'charge_rule/add.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def edit_charge_rule(request, pk):
     charge = get_object_or_404(ChargeRule, pk=pk)
@@ -631,7 +637,7 @@ def edit_charge_rule(request, pk):
         form = ChargeRuleForm(instance=charge)
     return render(request, 'charge_rule/edit.html', {'form': form})
 
-@login_required
+@login_required(login_url='admin_login')
 
 def delete_charge_rule(request, pk):
     charge = get_object_or_404(ChargeRule, pk=pk)
@@ -683,12 +689,13 @@ def exchange_rate_add(request):
 
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_dashboard(request):
     # Main totals
     total_staff = User.objects.filter(role='admin').count()
     total_clients = User.objects.filter(role='client').count()
     total_proofs = Proof.objects.count()
+    total_transactions = Transaction.objects.count()
 
     # Proof status counts
     proof_stats = Proof.objects.values('status').annotate(count=Count('id'))
@@ -717,25 +724,12 @@ def admin_dashboard(request):
         'top_clients': top_clients,
         'labels': week_labels,
         'week_data': week_data,
+        'total_transactions':total_transactions,
     }
     return render(request, 'dashboard/admin_dashboard.html', context)
 
-
 @csrf_protect
-@login_required
-def admin_proofs(request):
-    proofs_list = Proof.objects.select_related('user').order_by('-created_at')
-
-    paginator = Paginator(proofs_list, 10)  
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    return render(request, 'dashboard/proofs.html', {
-        'page_obj': page_obj,
-        'proofs': page_obj.object_list, 
-    })
-@csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_proofs(request):
     # Get all proofs
     proofs_list = Proof.objects.all().order_by('-created_at')
@@ -744,7 +738,7 @@ def admin_proofs(request):
     total_proofs = proofs_list.count()
     pending_count = proofs_list.filter(status='pending').count()
     received_count = proofs_list.filter(status='money_received').count()
-    delivered_count = proofs_list.filter(status='money_delivered').count()
+    delivered_count = proofs_list.filter(status='money_delivered').count()    
     
     # Handle search
     search_query = request.GET.get('q', '')
@@ -782,21 +776,31 @@ def admin_proofs(request):
         'status_filter': status_filter,
     })
 
+@login_required(login_url='admin_login')
+def delete_proof(request):
+    proof_id = request.POST.get('id')
+    try:
+        proof = Proof.objects.get(id=proof_id)
+        proof.delete()
+        return JsonResponse({'success': True, 'message': 'Proof deleted successfully.'})
+    except Proof.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Proof not found.'})
+
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_reports(request):
     reports = Proof.objects.values('status').annotate(total=Count('id')).order_by('-total')
     return render(request, 'dashboard/reports.html', {'reports': reports})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def admin_analytics(request):
     data = Proof.objects.extra({'day': "date(created_at)"}).values('day').annotate(total=Count('id')).order_by('day')
     return render(request, 'dashboard/analytics.html', {'data': data})
 
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def users_list(request):
     users_queryset = User.objects.all().order_by('-id')
     
@@ -833,7 +837,7 @@ def users_list(request):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_user(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST, request.FILES)
@@ -854,7 +858,7 @@ def add_user(request):
     return render(request, 'users/user_form.html', {'form': form, 'title': 'Register User'})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_user(request, pk):
     # Force JSON response for AJAX requests
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.method == 'POST':
@@ -896,7 +900,7 @@ def delete_user(request, pk):
     }, status=405)
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_user(request, pk): 
     user = get_object_or_404(User, id=pk)
 
@@ -922,8 +926,7 @@ def edit_user(request, pk):
 
     return render(request, 'users/user_form.html', {'form': form, 'title': 'Edit User'})
 
-@csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def proof_detail(request, proof_id):
     """Return proof details as JSON"""
     try:
@@ -944,7 +947,7 @@ def proof_detail(request, proof_id):
 
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def search_users(request):
     """Return filtered users as JSON"""
     query = request.GET.get('q', '').strip()
@@ -969,7 +972,7 @@ def search_users(request):
     return JsonResponse({'users': data})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def search_proofs(request):
     """Return filtered proofs as JSON"""
     query = request.GET.get('q', '').strip()
@@ -993,39 +996,53 @@ def search_proofs(request):
     return JsonResponse({'proofs': data})
 
 @csrf_protect
-def web_login(request):
+def admin_login(request):
+    if request.user.is_authenticated:
+        return redirect('admin_dashboard')
+
     if request.method == "POST":
-        username = request.POST.get('username')
+        email = request.POST.get('email')
         password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user:
+
+        user = authenticate(request, email=email, password=password)
+
+        if (
+            user
+            and user.is_active
+            and user.is_staff
+            and user.role in ['super_admin']
+        ):
             login(request, user)
+            request.session.cycle_key()
             return redirect('admin_dashboard')
-        return render(request, 'dashboard/login.html', {'error': 'Invalid credentials'})
+
+        messages.error(request, "Invalid credentials or access denied.")
+
     return render(request, 'dashboard/login.html')
 
+
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def company_info(request):
     data = CompanyInfo.objects.all()
     return render(request, 'dashboard/company_info.html', {'companies': data})
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def agents_list(request):
     data = Agent.objects.all()
     return render(request, 'dashboard/agents.html', {'agents': data})
 
 # --- List Agents ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def agents_list(request):
     agents = Agent.objects.all()
     return render(request, 'agents/agents.html', {'agents': agents, 'page_title': 'Agents'})
 
 # --- Add Agent ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_agent(request):
     form = AgentForm(request.POST or None, request.FILES or None)
     if form.is_valid():
@@ -1036,7 +1053,7 @@ def add_agent(request):
 
 # --- Edit Agent ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_agent(request, pk):
     agent = get_object_or_404(Agent, pk=pk)
     form = AgentForm(request.POST or None, request.FILES or None, instance=agent)
@@ -1048,7 +1065,7 @@ def edit_agent(request, pk):
 
 # --- Delete Agent ---
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_agent(request, pk):
     agent = get_object_or_404(Agent, pk=pk)
     if request.method == 'POST':
@@ -1062,7 +1079,7 @@ def delete_agent(request, pk):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def company_info(request):
  
     companies = CompanyInfo.objects.all()
@@ -1073,7 +1090,7 @@ def company_info(request):
     return render(request, 'company_info/company_info.html', context)
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_company(request):
     if request.method == "POST":
         form = CompanyInfoForm(request.POST, request.FILES)
@@ -1090,7 +1107,7 @@ def add_company(request):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_company(request, pk):
     company = get_object_or_404(CompanyInfo, pk=pk)
     if request.method == 'POST':
@@ -1109,7 +1126,7 @@ def edit_company(request, pk):
     })
 
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_company(request, pk):
     company = get_object_or_404(CompanyInfo, pk=pk)
     if request.method == 'POST':
@@ -1124,11 +1141,11 @@ def delete_company(request, pk):
         'cancel_url': '/company-info/'  # optional: cancel button URL
     })
 
-@login_required
+@login_required(login_url='admin_login')
 def profile_view(request):
     return render(request, 'profile/profile.html', {'user': request.user})
 
-@login_required
+@login_required(login_url='admin_login')
 def profile_edit(request):
     if request.method == 'POST':
         form = ProfileForm(request.POST, instance=request.user)
@@ -1142,8 +1159,7 @@ def profile_edit(request):
 
 def logout_view(request):
     logout(request)
-    messages.success(request, "You have been logged out successfully.")
-    return redirect('login')
+    return redirect('admin_login')
 
 
 def transaction_receipt(request, id):
@@ -1418,6 +1434,16 @@ def transactions(request):
     }
     
     return render(request, 'transactions/transactions.html', context)
+
+@login_required(login_url='admin_login')
+def delete_transaction(request):
+    transaction_id = request.POST.get('id')
+    try:
+        txn = Transaction.objects.get(id=transaction_id)
+        txn.delete()
+        return JsonResponse({'success': True, 'message': 'Transaction deleted successfully.'})
+    except Transaction.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Transaction not found.'})
 #  Excel download 
 def download_transactions_excel(transactions):
     wb = Workbook()
@@ -1540,14 +1566,14 @@ def exchange_rate_delete(request, id):
 
 # List
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def proof_steps_list(request):
     steps = UploadProofStep.objects.all()
     return render(request, 'upload_guide/steps_list.html', {'steps': steps, 'title': 'Upload Proof Steps'})
 
 # Add
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def add_proof_step(request):
     if request.method == "POST":
         form = UploadProofStepForm(request.POST)
@@ -1562,7 +1588,7 @@ def add_proof_step(request):
 
 # Edit
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def edit_proof_step(request, pk):
     step = get_object_or_404(UploadProofStep, pk=pk)
     if request.method == 'POST':
@@ -1578,7 +1604,7 @@ def edit_proof_step(request, pk):
 
 # Delete
 @csrf_protect
-@login_required
+@login_required(login_url='admin_login')
 def delete_proof_step(request, pk):
     step = get_object_or_404(UploadProofStep, pk=pk)
     if request.method == 'POST':
@@ -1592,7 +1618,7 @@ def delete_proof_step(request, pk):
         'cancel_url': '/upload-proof-steps/'  # Adjust to list URL
     })
 
-@login_required
+@login_required(login_url='admin_login')
 def add_whatsapp_contact(request):
     if request.method == 'POST':
         form = WhatsAppContactForm(request.POST)
@@ -1612,7 +1638,7 @@ def add_whatsapp_contact(request):
     return render(request, 'contacts/add_contact.html', context)
 
 
-@login_required
+@login_required(login_url='admin_login')
 def contacts_list(request):
     contacts = WhatsAppContact.objects.all().order_by('-id')
 
@@ -1654,7 +1680,7 @@ def contacts_list(request):
 
 
 
-@login_required
+@login_required(login_url='admin_login')
 def edit_whatsapp_contact(request, contact_id):
     contact = WhatsAppContact.objects.get(id=contact_id)
 
@@ -1670,7 +1696,7 @@ def edit_whatsapp_contact(request, contact_id):
     return render(request, 'contacts/edit_contact.html', {'form': form, 'contact': contact, 'title': 'Edit Contact'})
 
 
-@login_required
+@login_required(login_url='admin_login')
 def delete_whatsapp_contact(request, contact_id):
     contact = WhatsAppContact.objects.get(id=contact_id)
     if request.method == 'POST':
@@ -1678,3 +1704,47 @@ def delete_whatsapp_contact(request, contact_id):
         messages.success(request, 'Contact deleted successfully.')
         return redirect('contacts_list')
     return render(request, 'contacts/delete_contact.html', {'contact': contact, 'title': 'Delete Contact'})
+# List all announcements
+def announcement_list(request):
+    announcements = Announcement.objects.all()
+    return render(request, 'announcements/announcement_list.html', {'announcements': announcements})
+
+# Create new announcement
+def announcement_create(request):
+    if request.method == 'POST':
+        form = AnnouncementForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Announcement created successfully.')
+            return redirect('announcement_list')
+    else:
+        form = AnnouncementForm()
+    return render(request, 'announcements/announcement_form.html', {'form': form, 'title': 'Add Announcement'})
+
+# Update announcement
+def announcement_update(request, pk):
+    announcement = get_object_or_404(Announcement, pk=pk)
+    if request.method == 'POST':
+        form = AnnouncementForm(request.POST, request.FILES, instance=announcement)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Announcement updated successfully.')
+            return redirect('announcement_list')
+    else:
+        form = AnnouncementForm(instance=announcement)
+    return render(request, 'announcements/announcement_form.html', {'form': form, 'title': 'Edit Announcement'})
+
+# Delete announcement
+def announcement_delete(request, pk):
+    announcement = get_object_or_404(Announcement, pk=pk)
+    if request.method == 'POST':
+        if announcement.image:
+            try:
+                import os
+                os.remove(announcement.image.path)
+            except:
+                pass
+        announcement.delete()
+        messages.success(request, 'Announcement deleted successfully.')
+        return redirect('announcement_list')
+    return render(request, 'announcements/announcement_confirm_delete.html', {'announcement': announcement})

@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
 
-from api.models import Agent, ChargeRule, CompanyInfo, Country, Currency, UploadProofStep, User, WhatsAppContact
+from api.models import Agent, Announcement, ChargeRule, CompanyInfo, Country, Currency, UploadProofStep, User, WhatsAppContact
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 
 
@@ -220,3 +220,11 @@ class WhatsAppContactForm(forms.ModelForm):
             'phone_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '211XXXXX'}),
         }
 
+class AnnouncementForm(forms.ModelForm):
+    class Meta:
+        model = Announcement
+        fields = ['title', 'description', 'image', 'is_active', 'start_at', 'end_at']
+        widgets = {
+            'start_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'end_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        }

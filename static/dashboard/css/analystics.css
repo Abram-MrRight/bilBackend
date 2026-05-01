@@ -312,3 +312,44 @@
         padding: 1.5rem;
     }
 }
+/* Fix card content overflow */
+.analytics-card-premium,
+.gradient-card {
+    overflow: hidden;
+    word-wrap: break-word;
+}
+
+/* Reduce font-size for large numbers on smaller screens */
+@media (max-width: 768px) {
+    .analytics-value-premium,
+    .gradient-card .value-lg {
+        font-size: 2rem;
+    }
+}
+/* Gradient for active button */
+.btn-gradient-primary {
+    background: linear-gradient(90deg, #1E7F7F 0%, #4AC4C4 100%) !important;
+    color: #fff;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.btn-gradient-primary:hover {
+    filter: brightness(1.1);
+    text-decoration: none;
+}
+
+/* Outline style for inactive buttons */
+.btn-outline-gradient {
+    background: #fff;
+    color: #28a745;
+    border: 1px solid #28a745;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-gradient:hover {
+    background: #18dada;
+    color: #fff;
+    border-color:  #18dada;
+    text-decoration: none;
+}
