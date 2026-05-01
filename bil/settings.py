@@ -13,6 +13,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Read .env file with proper path
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
+CERTS_DIR = os.getenv("CERTS_DIR", os.path.join(BASE_DIR, "certs"))
+
+PRIVATE_KEY_PATH = os.path.join(CERTS_DIR, "bil_send.key")
+PUBLIC_KEY_PATH = os.path.join(CERTS_DIR, "bil_send.crt")
+
 # SECURITY WARNING: keep the secret key used in production secret!
 # Use environment variable for secret key in production
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-3x%pek=)69b)*e5vvq4x8hp_@!4+8(=8#_+v9zrg6lndze*&7v')

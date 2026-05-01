@@ -26,8 +26,10 @@ from Crypto.Cipher import PKCS1_OAEP
 from decimal import Decimal
 from django.utils.timezone import now
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-CERTS_DIR = os.path.join(BASE_DIR, 'certs')
+from bil.settings import PRIVATE_KEY_PATH, PUBLIC_KEY_PATH
+
+# BASE_DIR = Path(__file__).resolve().parent.parent
+# CERTS_DIR = os.path.join(BASE_DIR, 'certs')
 
 def get_company_info():
     
@@ -346,7 +348,7 @@ def decrypt_message(encoded_encrypted_msg):
     if not len(encoded_encrypted_msg) == 344:
         encoded_encrypted_msg = "Ciphertext with incorrect length" + encoded_encrypted_msg
 
-    privatekey = RSA.import_key(open(CERTS_DIR +'/bil_send.key', 'r').read())
+    privatekey = RSA.import_key(open(PRIVATE_KEY_PATH, 'r').read())
     decrypt = PKCS1_OAEP.new(key=privatekey)
 
     # Decode the base64 encoded message
@@ -367,7 +369,7 @@ def decrypt_message(encoded_encrypted_msg):
 ########## READ THE PUBLIC KEY AND PRIVATE KEYS FROM A DIRECTORY ##########
 def encrypt_message(a_message):
     a_message = a_message.encode('utf-8')
-    publickey = RSA.import_key(open(CERTS_DIR +'/bil_send.crt', 'r').read())
+    publickey = RSA.import_key(open(PUBLIC_KEY_PATH, 'r').read())
     #print(publickey, ".... public key")
     encryptor = PKCS1_OAEP.new(publickey)
     #print(encryptor, ".....encryptor......")
