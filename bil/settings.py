@@ -13,10 +13,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Read .env file with proper path
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-CERTS_DIR = os.getenv("CERTS_DIR", os.path.join(BASE_DIR, "certs"))
+CERTS_DIR = "/etc/bil/keys"
 
-PRIVATE_KEY_PATH = os.path.join(CERTS_DIR, "bil_send.key")
-PUBLIC_KEY_PATH = os.path.join(CERTS_DIR, "bil_send.crt")
+PRIVATE_KEY_PATH = os.path.join(CERTS_DIR, "private_key.pem")
+PUBLIC_KEY_PATH = os.path.join(CERTS_DIR, "public_key.pem")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # Use environment variable for secret key in production
