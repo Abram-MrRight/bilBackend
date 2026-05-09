@@ -215,9 +215,13 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOG_BASE_DIR, 'app.log'),
+            'when': 'D',          # daily-based rotation
+            'interval': 7,        # rotate every 7 days
+            'backupCount': 4,     # keep last 4 log files
             'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
         'console': {
             'class': 'logging.StreamHandler',
