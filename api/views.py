@@ -11,11 +11,11 @@ from django.db import transaction as db_transaction
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from api.utils import decrypt_message, encrypt_message, generate_receipt_pdf, send_receipt_email
+from api.utils import decrypt_message, encrypt_message, generate_otp_code, generate_receipt_pdf, send_receipt_email
 from .serializers import AgentSerializer, AnnouncementSerializer, ChargeRuleSerializer, CompanyInfoSerializer, CountrySerializer, CurrencySerializer, ProofSerializer, ProofStatusUpdateSerializer, RegisterSerializer, LoginSerializer, TransactionSerializer, UploadProofStepSerializer, UserSerializer, WhatsAppContactSerializer
 from rest_framework.views import APIView
 from rest_framework import generics, permissions, status
-from .models import Agent, Announcement, ChargeRule, CompanyInfo, Country, Currency, Proof, ProofRead, Transaction, UploadProofStep, User, WhatsAppContact
+from .models import OTP, Agent, Announcement, ChargeRule, CompanyInfo, Country, Currency, Proof, ProofRead, Transaction, UploadProofStep, User, WhatsAppContact
 from .serializers import UserSerializer, UserUpdateSerializer
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -946,3 +946,81 @@ class EncryptMessageView(APIView):
         encrypted = encrypt_message(message)
         return Response({'encrypted_message': encrypted}, status=status.HTTP_200_OK)
     
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def generate_otp(request):
+    email = request.data.get('email')
+
+    if not email:
+        return Response({
+            "success": False,
+            "message": "Email is required"
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Invalidate previous OTPs
+    OTP.objects.filter(email=email, is_used=False).update(is_used=True)
+
+    otp_code = generate_otp_code()
+
+    otp_obj = OTP.objects.create(
+        email=email,
+        otp_code=otp_code
+    )
+
+    # OPTIONAL: send email
+    try:
+        send_mail(
+            subject="Your OTP Code",
+            message=f"Your OTP code is {otp_code}. It expires in 5 minutes.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=True
+        )
+    except Exception as e:
+        print("Email OTP error:", e)
+
+    return Response({
+        "success": True,
+        "message": "OTP generated successfully",
+    }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    email = request.data.get('email')
+    otp_code = request.data.get('otp_code')
+
+    if not email or not otp_code:
+        return Response({
+            "success": False,
+            "message": "Email and OTP are required"
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        otp_obj = OTP.objects.filter(
+            email=email,
+            otp_code=otp_code,
+            is_used=False
+        ).latest('created_at')
+
+    except OTP.DoesNotExist:
+        return Response({
+            "success": False,
+            "message": "Invalid OTP"
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check expiry
+    if otp_obj.is_expired():
+        return Response({
+            "success": False,
+            "message": "OTP expired"
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Mark as used
+    otp_obj.is_used = True
+    otp_obj.save()
+
+    return Response({
+        "success": True,
+        "message": "OTP verified successfully"
+    }, status=status.HTTP_200_OK)

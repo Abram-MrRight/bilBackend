@@ -401,3 +401,16 @@ class WhatsAppContact(models.Model):
 
     def __str__(self):
         return f"{self.name or 'Default'}: {self.phone_number}"
+
+class OTP(models.Model):
+    email = models.EmailField()
+    otp_code = models.CharField(max_length=6)
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        # OTP valid for 5 minutes
+        return timezone.now() > self.created_at + timezone.timedelta(minutes=5)
+
+    def __str__(self):
+        return f"{self.email} - {self.otp_code}"

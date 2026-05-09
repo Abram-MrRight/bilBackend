@@ -2,6 +2,7 @@ import base64
 from io import BytesIO
 import os
 from pathlib import Path
+import random
 import textwrap
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -30,6 +31,9 @@ from bil.settings import PRIVATE_KEY_PATH, PUBLIC_KEY_PATH
 
 # BASE_DIR = Path(__file__).resolve().parent.parent
 # CERTS_DIR = os.path.join(BASE_DIR, 'certs')
+
+def generate_otp_code():
+    return str(random.randint(100000, 999999))
 
 def get_company_info():
     

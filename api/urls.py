@@ -37,4 +37,7 @@ urlpatterns = [
     path('transactions/', views.get_user_transactions, name='user-transactions'),
     path('encrypt_message', views.EncryptMessageView.as_view(), name='encrypt_message'),
 
+    path('otp_generate/', views.generate_otp, name = "otp_generate"),
+    path('otp_verify/', views.verify_otp, name = "otp_verify"),
+
 ]
