@@ -204,7 +204,18 @@ def analytics_dashboard(request):
     # BASE SETUP
     
     base_currency_code = getattr(settings, 'BASE_CURRENCY', 'UGX')
-    base_currency = Currency.objects.get(code=base_currency_code)
+
+    base_currency = Currency.objects.filter(
+        code=base_currency_code
+    ).first()
+
+    # fallback if configured currency does not exist
+    if not base_currency:
+        base_currency = Currency.objects.filter(code='UGX').first()
+
+    # final fallback
+    if not base_currency:
+        base_currency = Currency.objects.first()
 
     now = timezone.now()
     date_filter = request.GET.get('period', 'all')
@@ -1115,7 +1126,10 @@ def transactions(request):
       ).all().order_by('-confirmed_at')
 
     #  Base currency for reporting 
-    base_currency = Currency.objects.get(code='UGX')
+    base_currency = Currency.objects.filter(code='UGX').first()
+
+    if not base_currency:
+        base_currency = Currency.objects.first()
 
     #  Calculate global stats dynamically for all currencies 
     total_amount_base = Decimal('0.00')
