@@ -202,48 +202,48 @@ LOG_BASE_DIR = env('LOG_BASE_DIR', default=os.path.join(BASE_DIR, 'logs'))
 if not os.path.exists(LOG_BASE_DIR):
     os.makedirs(LOG_BASE_DIR, exist_ok=True)
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {asctime} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOG_BASE_DIR, 'app.log'),
-            'when': 'D',          # daily-based rotation
-            'interval': 7,        # rotate every 7 days
-            'backupCount': 4,     # keep last 4 log files
-            'formatter': 'verbose',
-            'encoding': 'utf-8',
-        },
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['file', 'console'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'api': {
-            'handlers': ['file', 'console'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': True,
-        },
-    },
-}
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'verbose': {
+#             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+#             'style': '{',
+#         },
+#         'simple': {
+#             'format': '{levelname} {asctime} {message}',
+#             'style': '{',
+#         },
+#     },
+#     'handlers': {
+#         'file': {
+#             'level': 'INFO',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOG_BASE_DIR, 'app.log'),
+#             'when': 'D',          # daily-based rotation
+#             'interval': 7,        # rotate every 7 days
+#             'backupCount': 4,     # keep last 4 log files
+#             'formatter': 'verbose',
+#             'encoding': 'utf-8',
+#         },
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#             'formatter': 'simple',
+#         },
+#     },
+#     'loggers': {
+#         'django': {
+#             'handlers': ['file', 'console'],
+#             'level': 'INFO',
+#             'propagate': True,
+#         },
+#         'api': {
+#             'handlers': ['file', 'console'],
+#             'level': 'DEBUG' if DEBUG else 'INFO',
+#             'propagate': True,
+#         },
+#     },
+# }
 
 # Jazzmin settings
 JAZZMIN_SETTINGS = {

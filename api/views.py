@@ -951,7 +951,6 @@ class EncryptMessageView(APIView):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def generate_otp(request):
-    logger.info("OTP VIEW HIT")
     email = request.data.get('email')
 
     if not email:
