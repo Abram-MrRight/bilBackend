@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from tokenize import TokenError
 import traceback
 import uuid
-from venv import logger
+import logging
 from warnings import filters
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -36,6 +36,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from api import serializers
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -950,6 +951,7 @@ class EncryptMessageView(APIView):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def generate_otp(request):
+    logger.info("OTP VIEW HIT")
     email = request.data.get('email')
 
     if not email:
@@ -977,8 +979,8 @@ def generate_otp(request):
             recipient_list=[email],
             fail_silently=False
         )
-    except Exception as e:
-        logger.exception("OTP EMAIL FAILED", e)
+    except Exception:
+      logger.exception("OTP EMAIL FAILED for email=%s", email)
 
     return Response({
         "success": True,
