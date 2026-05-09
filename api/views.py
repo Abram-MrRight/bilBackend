@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 from tokenize import TokenError
 import traceback
 import uuid
+from venv import logger
 from warnings import filters
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -974,10 +975,10 @@ def generate_otp(request):
             message=f"Your OTP code is {otp_code}. It expires in 5 minutes.",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
-            fail_silently=True
+            fail_silently=False
         )
     except Exception as e:
-        print("Email OTP error:", e)
+        logger.exception("OTP EMAIL FAILED", e)
 
     return Response({
         "success": True,
