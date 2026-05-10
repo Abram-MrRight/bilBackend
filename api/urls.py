@@ -39,5 +39,5 @@ urlpatterns = [
 
     path('otp_generate/', views.generate_otp, name = "otp_generate"),
     path('otp_verify/', views.verify_otp, name = "otp_verify"),
-
+    path("encrypt/", views.debug_encrypt),
 ]

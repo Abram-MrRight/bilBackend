@@ -1073,3 +1073,15 @@ def verify_otp(request):
         "success": True,
         "message": "OTP verified successfully"
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def debug_encrypt(request):
+    message = request.data.get("message")
+
+    from api.utils import encrypt_message
+
+    return Response({
+        "encrypted": encrypt_message(message)
+    })
