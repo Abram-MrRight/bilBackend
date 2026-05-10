@@ -795,7 +795,12 @@ def add_user(request):
         form = UserRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                user = form.save()
+                user = form.save(commit=False)
+                # AUTO VERIFY ADMIN CREATED BY SUPER ADMIN
+                if user.role in ['admin', 'super_admin']:
+                    user.is_verified = True
+
+                user.save()
                 messages.success(request, f'User {user.username} registered successfully.')
                 return redirect('users')
             except Exception as e:

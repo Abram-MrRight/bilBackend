@@ -73,6 +73,9 @@ def register(request):
     serializer = RegisterSerializer(data=mutable_data)
     if serializer.is_valid():
         user = serializer.save()
+        user.is_active = False
+        user.is_verified = False
+        user.save()
         refresh = RefreshToken.for_user(user)
         return Response({
             'success': True, 
@@ -110,6 +113,12 @@ def login(request):
 
     if not user.check_password(password):
         return Response({'success': False, 'message': 'Incorrect password'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    if not user.is_verified:
+        return Response({
+            'success': False,
+            'message': 'Please verify your OTP before logging in'
+        }, status=status.HTTP_401_UNAUTHORIZED)
 
     # Generate JWT
     refresh = RefreshToken.for_user(user)
@@ -1021,6 +1030,17 @@ def verify_otp(request):
     # Mark as used
     otp_obj.is_used = True
     otp_obj.save()
+
+    #ACTIVATE USER
+    try:
+        user = User.objects.get(email=email)
+        user.is_verified = True
+        user.save()
+    except User.DoesNotExist:
+        return Response({
+            "success": False,
+            "message": "User not found"
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({
         "success": True,
