@@ -195,7 +195,7 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Frontend URL
-FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:8000')
+FRONTEND_URL = env('FRONTEND_URL', default='https://bil.atong-abraham.site')
 
 # Logging
 LOG_BASE_DIR = env('LOG_BASE_DIR', default=os.path.join(BASE_DIR, 'logs'))
