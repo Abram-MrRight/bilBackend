@@ -59,7 +59,7 @@ def decrypt_required_fields(request_data, fields):
 @permission_classes([AllowAny])
 def register(request):
     # Decrypt required fields first
-    fields_to_decrypt = ["fullname", "email", "phone_number", "password"]
+    fields_to_decrypt = ["fullname", "phone_number", "password"]
     try:
         decrypted = decrypt_required_fields(request.data, fields_to_decrypt)
     except ValueError as e:
@@ -962,8 +962,7 @@ class EncryptMessageView(APIView):
 def generate_otp(request):
 
     try:
-        decrypted = decrypt_required_fields(request.data, ["email"])
-        email = decrypted.get("email", "").strip()
+        email = request.data.get("email", "").strip()
     except ValueError as e:
         return Response({
             "success": False,
@@ -1015,12 +1014,7 @@ def generate_otp(request):
 def verify_otp(request):
 
     try:
-        decrypted = decrypt_required_fields(
-            request.data,
-            ["email", "otp_code"]
-        )
-
-        email = decrypted.get("email", "").strip()
+        email = request.data.get("email", "").strip()
         otp_code = request.data.get("otp_code", "").strip()
 
     except ValueError as e:
