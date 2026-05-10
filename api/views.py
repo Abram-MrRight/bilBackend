@@ -960,7 +960,15 @@ class EncryptMessageView(APIView):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def generate_otp(request):
-    email = request.data.get('email')
+
+    try:
+        decrypted = decrypt_required_fields(request.data, ["email"])
+        email = decrypted.get("email", "").strip()
+    except ValueError as e:
+        return Response({
+            "success": False,
+            "message": str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     if not email:
         return Response({
@@ -968,17 +976,15 @@ def generate_otp(request):
             "message": "Email is required"
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Invalidate previous OTPs
     OTP.objects.filter(email=email, is_used=False).update(is_used=True)
 
     otp_code = generate_otp_code()
 
-    otp_obj = OTP.objects.create(
+    OTP.objects.create(
         email=email,
         otp_code=otp_code
     )
 
-    # OPTIONAL: send email
     try:
         send_mail(
             subject="Your OTP Code",
@@ -987,8 +993,17 @@ def generate_otp(request):
             recipient_list=[email],
             fail_silently=False
         )
-    except Exception:
-      logger.exception("OTP EMAIL FAILED for email=%s", email)
+
+        print(f"OTP SENT TO: {email}")
+
+    except Exception as e:
+        logger.exception("OTP EMAIL FAILED")
+        print("EMAIL ERROR:", str(e))
+
+        return Response({
+            "success": False,
+            "message": f"Email sending failed: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response({
         "success": True,
@@ -998,8 +1013,21 @@ def generate_otp(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def verify_otp(request):
-    email = request.data.get('email')
-    otp_code = request.data.get('otp_code')
+
+    try:
+        decrypted = decrypt_required_fields(
+            request.data,
+            ["email", "otp_code"]
+        )
+
+        email = decrypted.get("email", "").strip()
+        otp_code = request.data.get("otp_code", "").strip()
+
+    except ValueError as e:
+        return Response({
+            "success": False,
+            "message": str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     if not email or not otp_code:
         return Response({
@@ -1020,22 +1048,21 @@ def verify_otp(request):
             "message": "Invalid OTP"
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Check expiry
     if otp_obj.is_expired():
         return Response({
             "success": False,
             "message": "OTP expired"
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Mark as used
     otp_obj.is_used = True
     otp_obj.save()
 
-    #ACTIVATE USER
     try:
         user = User.objects.get(email=email)
         user.is_verified = True
+        user.is_active = True
         user.save()
+
     except User.DoesNotExist:
         return Response({
             "success": False,
