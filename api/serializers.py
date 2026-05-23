@@ -151,7 +151,7 @@ class ProofReadSerializer(serializers.ModelSerializer):
 class CountrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Country
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'code']
 
 class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
