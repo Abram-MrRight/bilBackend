@@ -599,16 +599,13 @@ def update_proof_status(request, proof_id):
     if 'status_note' in data and data['status_note']:
         decrypted_data['status_note'] = decrypt_message(data['status_note']) if len(data['status_note']) > 100 else data['status_note']
 
-    # ⚠️ charge_rule is NOT in Proof → extract separately
-    charge_rule_id = data.get('charge_rule', None)
-    selected_charge_rule = None
-
-    if charge_rule_id:
-        try:
-            selected_charge_rule = ChargeRule.objects.get(id=int(charge_rule_id))
-        except:
-            selected_charge_rule = None
-
+    selected_charge_rule = (
+        ChargeRule.objects
+        .filter(currency=proof.currency, is_active=True)
+        .order_by('-priority')
+        .first()
+    )
+    
     # serializer ONLY handles Proof fields
     serializer = ProofStatusUpdateSerializer(
         proof,
