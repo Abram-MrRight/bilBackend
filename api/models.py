@@ -235,22 +235,6 @@ class Currency(models.Model):
 class ChargeRule(models.Model):
     country = models.ForeignKey(Country, on_delete=models.CASCADE)
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
-    min_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    max_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    charge_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    charge_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('country', 'currency', 'min_amount', 'max_amount')
-
-    def __str__(self):
-        return f"{self.country.name} | {self.currency.code} | {self.min_amount}-{self.max_amount}"
-    
-class ChargeRule(models.Model):
-    country = models.ForeignKey(Country, on_delete=models.CASCADE)
-    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
 
     charge_percentage = models.DecimalField(
         max_digits=5,
