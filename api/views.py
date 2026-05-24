@@ -908,7 +908,7 @@ def get_whatsapp_contact(request, contact_id=None):
         serializer = WhatsAppContactSerializer(contact)
         return Response({'success': True, 'data': serializer.data})
     else:  # All contacts
-        contacts = WhatsAppContact.objects.all()
+        contacts = WhatsAppContact.objects.all().order_by('-priority', 'id')
         serializer = WhatsAppContactSerializer(contacts, many=True)
         return Response({'success': True, 'data': serializer.data})
     
