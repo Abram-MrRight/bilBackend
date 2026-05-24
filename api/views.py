@@ -578,131 +578,68 @@ def delete_proof(request, proof_id):
 @permission_classes([IsAuthenticated])
 def update_proof_status(request, proof_id):
     user = request.user
-    for key, value in request.data.items():
-        print(f"  {key}: {value} (type: {type(value)})")
-        if isinstance(value, str) and len(value) > 100:
-            print(f"    Looks encrypted: Yes")
-        else:
-            print(f"    Looks encrypted: No")
 
-    # Only admin can update
+    # Admin check
     if not hasattr(user, 'role') or user.role.lower() != 'admin':
-        return Response({'success': False, 'message': 'Unauthorized - Admins only'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(
+            {'success': False, 'message': 'Unauthorized - Admins only'},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
     proof = get_object_or_404(Proof, id=proof_id)
 
-    # Prepare data for processing
     data = request.data.copy()
-    
-    # Handle decryption for text fields only
     decrypted_data = {}
-    
-    # Decrypt status field if it's encrypted
-    if 'status' in data and data['status']:
-        try:
-            if isinstance(data['status'], str) and len(data['status']) > 100:
-                # Likely encrypted
-                decrypted_data['status'] = decrypt_message(data['status'])
-            else:
-                decrypted_data['status'] = data['status']
-        except Exception as e:
-            print(f"Error decrypting status: {e}")
-            decrypted_data['status'] = data['status']
-    
-    # Decrypt status_note field if it exists
+
+    # decrypt status
+    if 'status' in data:
+        decrypted_data['status'] = decrypt_message(data['status']) if len(data['status']) > 100 else data['status']
+
+    # decrypt note
     if 'status_note' in data and data['status_note']:
+        decrypted_data['status_note'] = decrypt_message(data['status_note']) if len(data['status_note']) > 100 else data['status_note']
+
+    # ⚠️ charge_rule is NOT in Proof → extract separately
+    charge_rule_id = data.get('charge_rule', None)
+    selected_charge_rule = None
+
+    if charge_rule_id:
         try:
-            if isinstance(data['status_note'], str) and len(data['status_note']) > 100:
-                decrypted_data['status_note'] = decrypt_message(data['status_note'])
-            else:
-                decrypted_data['status_note'] = data['status_note']
-        except Exception as e:
-            print(f"Error decrypting status_note: {e}")
-            decrypted_data['status_note'] = data['status_note']
-    
-    # Handle charge_rule - it should be an ID
-    if 'charge_rule' in data and data['charge_rule']:
-        try:
-            charge_rule_value = data['charge_rule']
-            
-            # If it's a string that looks encrypted, decrypt it
-            if isinstance(charge_rule_value, str):
-                if len(charge_rule_value) > 100:
-                    # Likely encrypted
-                    try:
-                        decrypted_value = decrypt_message(charge_rule_value)
-                        print(f"Decrypted charge_rule: {decrypted_value}")
-                        decrypted_data['charge_rule'] = int(decrypted_value)
-                    except Exception as e:
-                        print(f"Error decrypting charge_rule: {e}")
-                        # Try to parse as int directly
-                        try:
-                            decrypted_data['charge_rule'] = int(charge_rule_value)
-                        except:
-                            decrypted_data['charge_rule'] = None
-                else:
-                    # Not encrypted, try to convert to int
-                    try:
-                        decrypted_data['charge_rule'] = int(charge_rule_value)
-                    except:
-                        decrypted_data['charge_rule'] = None
-            elif isinstance(charge_rule_value, int):
-                # Already an int
-                decrypted_data['charge_rule'] = charge_rule_value
-            elif isinstance(charge_rule_value, dict):
-                # Received an object, extract ID
-                decrypted_data['charge_rule'] = charge_rule_value.get('id')
-            else:
-                decrypted_data['charge_rule'] = None
-        except Exception as e:
-            print(f"Error processing charge_rule: {e}")
-            decrypted_data['charge_rule'] = None
-    
-    
-    # Update proof status
-    serializer = ProofStatusUpdateSerializer(proof, data=decrypted_data, partial=True)
-    
+            selected_charge_rule = ChargeRule.objects.get(id=int(charge_rule_id))
+        except:
+            selected_charge_rule = None
+
+    # serializer ONLY handles Proof fields
+    serializer = ProofStatusUpdateSerializer(
+        proof,
+        data=decrypted_data,
+        partial=True
+    )
+
     if not serializer.is_valid():
-        print(f"Serializer validation errors: {serializer.errors}")
         return Response({
             'success': False,
             'message': 'Validation failed',
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    try:
-        # Use atomic transaction for data consistency
-        with db_transaction.atomic():
-            # Save the serializer - this will update the proof
-            updated_proof = serializer.save()
-            
-            status_value = serializer.validated_data.get('status')
-            
-            # Get the charge_rule from the serializer's validated_data
-            # It will be a ChargeRule object instance if it was saved
-            charge_rule_obj = serializer.validated_data.get('charge_rule')
-            selected_charge_rule = None
-            
-            if charge_rule_obj:
-                selected_charge_rule = charge_rule_obj
-                print(f"Selected charge rule: {selected_charge_rule.id} - {selected_charge_rule}")
-            
-            # If money delivered, create transaction  
-            if status_value == 'money_delivered':
-                # Check if transaction already exists
-                if not Transaction.objects.filter(proof=proof).exists():
-                    # Calculate charge amount
-                    charge_amount = Decimal('0')
 
+    try:
+        with db_transaction.atomic():
+
+            updated_proof = serializer.save()
+            status_value = serializer.validated_data.get('status')
+
+            # 🚨 only when delivered
+            if status_value == 'money_delivered':
+
+                if not Transaction.objects.filter(proof=proof).exists():
+
+                    charge_amount = Decimal('0')
                     if selected_charge_rule:
                         charge_amount = selected_charge_rule.calculate_charge(proof.amount)
-                    
-                    # Calculate net amount
-                    net_amount = proof.amount - charge_amount
-                    if net_amount < 0:
-                        net_amount = Decimal('0')
-                    
-                    # Create transaction
+
+                    net_amount = max(proof.amount - charge_amount, Decimal('0'))
+
                     tx = Transaction.objects.create(
                         proof=proof,
                         user=proof.user,
@@ -716,57 +653,43 @@ def update_proof_status(request, proof_id):
                         charge_rule=selected_charge_rule,
                         charge_amount=charge_amount,
                         net_amount=net_amount,
-                        country=proof.country,  
-                        original_currency=proof.currency, 
-                        original_amount=proof.amount, 
+                        country=proof.country,
+                        original_currency=proof.currency,
+                        original_amount=proof.amount,
                         ugx_equivalent=Decimal('0'),
                     )
-                    
-                    # Generate PDF and send email
+
                     try:
                         pdf_bytes = generate_receipt_pdf(tx)
                         send_receipt_email(tx, pdf_bytes)
-                        print(f"Receipt email sent for transaction {tx.id}")
                     except Exception as e:
-                        print(f"Error generating PDF or sending email: {e}")
-                        # Don't fail the transaction if email fails
-                    
-                    # Delete proof (optional)
+                        print("Email error:", e)
+
                     proof.delete()
-                    
+
                     return Response({
                         'success': True,
-                        'message': 'Delivery confirmed, transaction recorded, and proof deleted',
+                        'message': 'Delivery confirmed and transaction created',
                         'transaction_id': tx.id
-                    }, status=status.HTTP_200_OK)
-                else:
-                    return Response({
-                        'success': False,
-                        'message': 'Transaction already exists for this proof'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Update proof read status if not deleted
+                    })
+
             ProofRead.objects.update_or_create(
                 proof=proof,
                 user=proof.user,
                 defaults={'is_read': False, 'read_at': None}
             )
 
-            # Get the updated proof data for response
-            response_data = ProofStatusUpdateSerializer(updated_proof).data
-            
             return Response({
                 'success': True,
                 'message': 'Proof status updated successfully',
-                'data': response_data
-            }, status=status.HTTP_200_OK)
-            
+                'data': ProofStatusUpdateSerializer(updated_proof).data
+            })
+
     except Exception as e:
-        print(f"Error in update_proof_status: {str(e)}")
         traceback.print_exc()
         return Response({
             'success': False,
-            'message': f'Server error: {str(e)}'
+            'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @permission_classes([permissions.IsAuthenticated])
