@@ -914,7 +914,7 @@ def get_whatsapp_contact(request, contact_id=None):
                 'data': []
             }, status=status.HTTP_404_NOT_FOUND)
 
-    contacts = WhatsAppContact.objects.all().order_by('-priority', 'id')
+    contacts = WhatsAppContact.objects.all().order_by('id')
     serializer = WhatsAppContactSerializer(contacts, many=True)
 
     return Response({
