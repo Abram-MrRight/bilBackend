@@ -21,31 +21,34 @@ class ChargeRuleForm(forms.ModelForm):
         empty_label="Select Country",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+
     currency = forms.ModelChoiceField(
-      queryset=Currency.objects.all(),        empty_label="Select Currency",
+        queryset=Currency.objects.all(),
+        empty_label="Select Currency",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
 
     class Meta:
         model = ChargeRule
-        fields = ['country', 'currency', 'min_amount', 'max_amount', 'charge_amount']
+        fields = ['country', 'currency', 'charge_percentage']
         widgets = {
-            'min_amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'max_amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'charge_amount': forms.NumberInput(attrs={'class': 'form-control'}),
+            'charge_percentage': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         if 'country' in self.data:
             try:
                 country_id = int(self.data.get('country'))
                 self.fields['currency'].queryset = Currency.objects.filter(country_id=country_id)
             except (ValueError, TypeError):
                 pass
-        elif self.instance.pk:
-            self.fields['currency'].queryset = Currency.objects.filter(country=self.instance.country)
 
+        elif self.instance.pk:
+            self.fields['currency'].queryset = Currency.objects.filter(
+                country=self.instance.country
+            )
 
 
 class UserRegistrationForm(UserCreationForm):

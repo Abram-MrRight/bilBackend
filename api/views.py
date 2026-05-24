@@ -578,12 +578,6 @@ def delete_proof(request, proof_id):
 @permission_classes([IsAuthenticated])
 def update_proof_status(request, proof_id):
     user = request.user
-    
-    print(f"=== UPDATE PROOF STATUS REQUEST ===")
-    print(f"User: {user.username} (Role: {getattr(user, 'role', 'N/A')})")
-    print(f"Proof ID: {proof_id}")
-    print(f"Request data: {request.data}")
-    print(f"Data types:")
     for key, value in request.data.items():
         print(f"  {key}: {value} (type: {type(value)})")
         if isinstance(value, str) and len(value) > 100:
@@ -630,7 +624,6 @@ def update_proof_status(request, proof_id):
     if 'charge_rule' in data and data['charge_rule']:
         try:
             charge_rule_value = data['charge_rule']
-            print(f"Processing charge_rule value: {charge_rule_value} (type: {type(charge_rule_value)})")
             
             # If it's a string that looks encrypted, decrypt it
             if isinstance(charge_rule_value, str):
@@ -665,7 +658,6 @@ def update_proof_status(request, proof_id):
             print(f"Error processing charge_rule: {e}")
             decrypted_data['charge_rule'] = None
     
-    print(f"Decrypted data for serializer: {decrypted_data}")
     
     # Update proof status
     serializer = ProofStatusUpdateSerializer(proof, data=decrypted_data, partial=True)
@@ -701,8 +693,9 @@ def update_proof_status(request, proof_id):
                 if not Transaction.objects.filter(proof=proof).exists():
                     # Calculate charge amount
                     charge_amount = Decimal('0')
+
                     if selected_charge_rule:
-                        charge_amount = selected_charge_rule.charge_amount
+                        charge_amount = selected_charge_rule.calculate_charge(proof.amount)
                     
                     # Calculate net amount
                     net_amount = proof.amount - charge_amount

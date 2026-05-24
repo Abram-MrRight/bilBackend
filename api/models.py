@@ -247,7 +247,30 @@ class ChargeRule(models.Model):
 
     def __str__(self):
         return f"{self.country.name} | {self.currency.code} | {self.min_amount}-{self.max_amount}"
+    
+class ChargeRule(models.Model):
+    country = models.ForeignKey(Country, on_delete=models.CASCADE)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
 
+    charge_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0
+    )
+
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'charge_rules'
+        unique_together = ('country', 'currency')
+
+    def calculate_charge(self, amount):
+        amount = Decimal(amount)
+        return (amount * self.charge_percentage) / Decimal('100')
+
+    def __str__(self):
+        return f"{self.country.name} | {self.currency.code} | {self.charge_percentage}%"
 
 class Transaction(models.Model):
     proof = models.OneToOneField(

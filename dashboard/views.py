@@ -534,7 +534,6 @@ def get_currencies(request, country_id):
 
 #  CHARGERULE VIEWS 
 @login_required(login_url='admin_login')
-
 def charge_rule_list(request):
     rules = ChargeRule.objects.select_related('country', 'currency').all()
     return render(request, 'charge_rule/list.html', {'rules': rules})
