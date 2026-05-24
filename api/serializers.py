@@ -117,9 +117,18 @@ class ProofStatusUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ['charge_rule_id']
     
     def validate_status(self, value):
-        valid_statuses = ['pending', 'verified', 'money_delivered', 'rejected']
+        valid_statuses = [
+            'pending',
+            'money_received',
+            'receiver_contacted',
+            'money_delivered',
+        ]
+
         if value not in valid_statuses:
-            raise serializers.ValidationError(f"Status must be one of: {', '.join(valid_statuses)}")
+            raise serializers.ValidationError(
+                f"Status must be one of: {', '.join(valid_statuses)}"
+            )
+
         return value
     
     def to_representation(self, instance):
