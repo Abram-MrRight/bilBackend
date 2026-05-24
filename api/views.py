@@ -900,17 +900,27 @@ def get_upload_proof_steps(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_whatsapp_contact(request, contact_id=None):
-    if contact_id:  # Single contact
+    if contact_id:
         try:
             contact = WhatsAppContact.objects.get(id=contact_id)
+            serializer = WhatsAppContactSerializer(contact)
+            return Response({
+                'success': True,
+                'data': [serializer.data]   # 🔥 ALWAYS LIST
+            })
         except WhatsAppContact.DoesNotExist:
-            return Response({'success': False, 'message': 'Contact not found.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = WhatsAppContactSerializer(contact)
-        return Response({'success': True, 'data': serializer.data})
-    else:  # All contacts
-        contacts = WhatsAppContact.objects.all().order_by('-priority', 'id')
-        serializer = WhatsAppContactSerializer(contacts, many=True)
-        return Response({'success': True, 'data': serializer.data})
+            return Response({
+                'success': False,
+                'data': []
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    contacts = WhatsAppContact.objects.all().order_by('-priority', 'id')
+    serializer = WhatsAppContactSerializer(contacts, many=True)
+
+    return Response({
+        'success': True,
+        'data': serializer.data   # already list
+    })
     
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
