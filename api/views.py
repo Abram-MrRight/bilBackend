@@ -601,7 +601,7 @@ def update_proof_status(request, proof_id):
 
     selected_charge_rule = (
         ChargeRule.objects
-        .filter(currency=proof.currency, is_active=True)
+        .filter(currency__code=proof.currency, is_active=True)
         .order_by('-priority')
         .first()
     )
