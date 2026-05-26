@@ -683,10 +683,17 @@ def update_proof_status(request, proof_id):
             })
 
     except Exception as e:
-        traceback.print_exc()
+        import traceback
+
+        error_trace = traceback.format_exc()
+
+        print("FULL ERROR TRACE:")
+        print(error_trace)
+
         return Response({
             'success': False,
-            'message': str(e)
+            'message': str(e),
+            'trace': error_trace,
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @permission_classes([permissions.IsAuthenticated])
