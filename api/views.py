@@ -687,8 +687,9 @@ def update_proof_status(request, proof_id):
 
         error_trace = traceback.format_exc()
 
-        print("FULL ERROR TRACE:")
-        print(error_trace)
+        logger.error("❌ ERROR IN update_proof_status")
+        logger.error(f"Exception: {str(e)}")
+        logger.error("Traceback:\n%s", error_trace)
 
         return Response({
             'success': False,
