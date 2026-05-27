@@ -112,11 +112,11 @@
                 data-url-name="company_info">
                     Company Information
                 </a>
-                <a href="{% url 'agents' %}" 
+                {% comment %} <a href="{% url 'agents' %}" 
                 class="nav-link {% if 'agents' in request.resolver_match.url_name %}active{% endif %}"
                 data-url-name="agents">
                     Agents
-                </a>
+                </a> {% endcomment %}
                 <a href="{% url 'proof_steps_list' %}" 
                 class="nav-link {% if 'proof_steps' in request.resolver_match.url_name %}active{% endif %}"
                 data-url-name="proof_steps">
@@ -146,11 +146,11 @@
                 </a>
 
                 <!-- Exchange Rate -->
-                <a href="{% url 'exchange_rate_list' %}" 
+                {% comment %} <a href="{% url 'exchange_rate_list' %}" 
                 class="nav-link {% if 'exchange_rate' in request.resolver_match.url_name %}active{% endif %}"
                 data-url-name="exchange_rate">
                     Exchange Rate
-                </a>
+                </a> {% endcomment %}
             </div>
         </li>
         <li class="nav-item">

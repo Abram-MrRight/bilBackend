@@ -626,7 +626,7 @@ def update_proof_status(request, proof_id):
             updated_proof = serializer.save()
             status_value = serializer.validated_data.get('status')
 
-            # 🚨 only when delivered
+            #only when delivered
             if status_value == 'money_delivered':
 
                 if not Transaction.objects.filter(proof=proof).exists():
@@ -827,7 +827,7 @@ def get_whatsapp_contact(request, contact_id=None):
             serializer = WhatsAppContactSerializer(contact)
             return Response({
                 'success': True,
-                'data': [serializer.data]   # 🔥 ALWAYS LIST
+                'data': [serializer.data] 
             })
         except WhatsAppContact.DoesNotExist:
             return Response({
