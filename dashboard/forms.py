@@ -1,6 +1,6 @@
+import phonenumbers
 from django import forms
 from django.contrib.auth.models import User
-
 from api.models import Agent, Announcement, ChargeRule, CompanyInfo, Country, Currency, UploadProofStep, User, WhatsAppContact
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 
@@ -219,9 +219,40 @@ class WhatsAppContactForm(forms.ModelForm):
         model = WhatsAppContact
         fields = ['name', 'phone_number']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contact Name'}),
-            'phone_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '211XXXXX'}),
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Contact Name'
+            }),
+            'phone_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+256772XXXXXX or 211XXXXXX'
+            }),
         }
+
+    def clean_phone_number(self):
+        raw_number = self.cleaned_data['phone_number']
+
+        try:
+            # Parse number (no assumption about country)
+            parsed = phonenumbers.parse(raw_number, None)
+
+            # Validate number
+            if not phonenumbers.is_valid_number(parsed):
+                raise forms.ValidationError("Invalid phone number")
+
+            # Convert to E.164 format (WhatsApp required format)
+            formatted = phonenumbers.format_number(
+                parsed,
+                phonenumbers.PhoneNumberFormat.E164
+            )
+
+            # remove "+" for WhatsApp compatibility
+            return formatted.replace('+', '')
+
+        except phonenumbers.NumberParseException:
+            raise forms.ValidationError(
+                "Enter a valid international phone number"
+            )
 
 class AnnouncementForm(forms.ModelForm):
     class Meta:
