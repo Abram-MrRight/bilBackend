@@ -667,7 +667,7 @@ def update_proof_status(request, proof_id):
                     return Response({
                         'success': True,
                         'message': 'Delivery confirmed and transaction created',
-                        'transaction_id': tx.id
+                        'data': ProofStatusUpdateSerializer(updated_proof).data  
                     })
 
             ProofRead.objects.update_or_create(
