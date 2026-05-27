@@ -99,11 +99,6 @@ class ProofSerializer(serializers.ModelSerializer):
         ]
 
 class ProofStatusUpdateSerializer(serializers.ModelSerializer):
-    charge_rule = serializers.PrimaryKeyRelatedField(
-        queryset=ChargeRule.objects.all(),
-        required=False, 
-        allow_null=True
-    )
     
     class Meta:
         model = Proof
