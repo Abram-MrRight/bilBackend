@@ -659,7 +659,7 @@ def admin_dashboard(request):
         .order_by('-transactions_count')[:5]
     )
 
-    # Weekly submissions (past 7 days)
+    # WEEKLY submissions (past 7 days)
     today = timezone.now().date()
     week_labels = [(today - timedelta(days=i)).strftime('%a') for i in reversed(range(7))]
     week_data = [
@@ -667,15 +667,40 @@ def admin_dashboard(request):
         for i in reversed(range(7))
     ]
 
+    # MONTHLY submissions (last 30 days)
+    month_labels = []
+    month_data = []
+    for i in range(29, -1, -1):  # Last 30 days
+        date = today - timedelta(days=i)
+        month_labels.append(date.strftime('%b %d'))  # e.g., "Dec 15"
+        count = Proof.objects.filter(created_at__date=date).count()
+        month_data.append(count)
+
+    # YEARLY submissions (last 12 months)
+    year_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    year_data = []
+    current_year = today.year
+    for month in range(1, 13):
+        count = Proof.objects.filter(
+            created_at__year=current_year,
+            created_at__month=month
+        ).count()
+        year_data.append(count)
+
     context = {
         'total_staff': total_staff,
         'total_clients': total_clients,
         'total_proofs': total_proofs,
         'proof_stats': proof_stats_dict,
         'top_clients': top_clients,
-        'labels': week_labels,
+        'week_labels': week_labels,
         'week_data': week_data,
-        'total_transactions':total_transactions,
+        'month_labels': month_labels,
+        'month_data': month_data,
+        'year_labels': year_labels,
+        'year_data': year_data,
+        'total_transactions': total_transactions,
     }
     return render(request, 'dashboard/admin_dashboard.html', context)
 
