@@ -100,7 +100,7 @@ WSGI_APPLICATION = 'bil.wsgi.application'
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=env("DATABASE_URL")
+        default=env("DATABASE_URL", default="sqlite:///db.sqlite3")
     )
 }
 # Choose database type based on environment variable
@@ -171,11 +171,11 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-AWS_ACCESS_KEY_ID = env('CLOUDFLARE_R2_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = env('CLOUDFLARE_R2_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = env('CLOUDFLARE_R2_BUCKET_NAME')
-AWS_S3_ENDPOINT_URL = env('CLOUDFLARE_R2_ENDPOINT_URL')
-CLOUDFLARE_R2_CUSTOM_DOMAIN = env('CLOUDFLARE_R2_CUSTOM_DOMAIN')
+AWS_ACCESS_KEY_ID = env('CLOUDFLARE_R2_ACCESS_KEY_ID', default='')
+AWS_SECRET_ACCESS_KEY = env('CLOUDFLARE_R2_SECRET_ACCESS_KEY', default='')
+AWS_STORAGE_BUCKET_NAME = env('CLOUDFLARE_R2_BUCKET_NAME', default='')
+AWS_S3_ENDPOINT_URL = env('CLOUDFLARE_R2_ENDPOINT_URL', default='')
+CLOUDFLARE_R2_CUSTOM_DOMAIN = env('CLOUDFLARE_R2_CUSTOM_DOMAIN', default='')
 
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
