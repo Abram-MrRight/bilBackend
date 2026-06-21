@@ -6,7 +6,6 @@ from botocore.client import Config
 import environ
 from decouple import config
 import dj_database_url
-
 # Initialize environ
 env = environ.Env()
 
@@ -171,38 +170,34 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+STATIC_URL = '/static/'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 AWS_ACCESS_KEY_ID = env('CLOUDFLARE_R2_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('CLOUDFLARE_R2_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = env('CLOUDFLARE_R2_BUCKET_NAME', default='')
 AWS_S3_ENDPOINT_URL = env('CLOUDFLARE_R2_ENDPOINT_URL', default='')
 CLOUDFLARE_R2_CUSTOM_DOMAIN = env('CLOUDFLARE_R2_CUSTOM_DOMAIN', default='')
 
-AWS_S3_OBJECT_PARAMETERS = {
-    "CacheControl": "max-age=86400",
+CLOUDFLARE_R2_CONFIG_OPTIONS ={
+    "bucket_name": AWS_STORAGE_BUCKET_NAME,
+    "default_acl": "public-read",
+    "signature_version": "s3v4",
+    "endpoint_url": AWS_S3_ENDPOINT_URL,
+    "access_key": AWS_ACCESS_KEY_ID,
+    "secret_key": AWS_SECRET_ACCESS_KEY,
 }
-AWS_DEFAULT_ACL = None
-AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_AUTH = False
 
-# STATICFILES_STORAGE = 'api.storage_backends.StaticStorage'
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
-DEFAULT_FILE_STORAGE = 'api.storage_backends.MediaStorage'
-
-MEDIA_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/"
-# STATIC_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/static/"
-
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# STATICFILES_DIRS = [
-#     os.path.join(BASE_DIR, "static"),
-# ]
-
-# Media files
-# MEDIA_URL = '/media/'
-# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+STORAGES = {
+    "default": {
+        "BACKEND": "helper.cloudflare.storages.MediaFileStorage",
+        "OPTIONS":CLOUDFLARE_R2_CONFIG_OPTIONS,
+    },
+    "staticfiles": {
+        "BACKEND": "helper.cloudflare.storages.StaticFileStorage",
+        "OPTIONS":CLOUDFLARE_R2_CONFIG_OPTIONS,
+    },
+}
 
 # Login URLs
 LOGIN_URL = '/login/'
