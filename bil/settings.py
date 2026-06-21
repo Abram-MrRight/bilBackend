@@ -1,8 +1,11 @@
 from pathlib import Path
 from datetime import timedelta
 import os
+import boto3
+from botocore.client import Config
 import environ
 from decouple import config
+import dj_database_url
 
 # Initialize environ
 env = environ.Env()
@@ -62,6 +65,7 @@ INSTALLED_APPS = [
     'dashboard',
     'widget_tweaks',
     'django.contrib.humanize',
+    'storages',
 ]
 
 MIDDLEWARE = [
@@ -93,27 +97,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'bil.wsgi.application'
 
-# Choose database type based on environment variable
-DATABASE_TYPE = env('DATABASE_TYPE', default='sqlite')
 
-if DATABASE_TYPE == 'postgresql':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('DB_NAME', default='bilbackend_db'),
-            'USER': env('DB_USER', default='bilbackend_user'),
-            'PASSWORD': env('DB_PASSWORD', default=''),
-            'HOST': env('DB_HOST', default='localhost'),
-            'PORT': env('DB_PORT', default='5432'),
-        }
-    }
-else:  # Default to SQLite
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+DATABASES = {
+    "default": dj_database_url.config(
+        default=env("DATABASE_URL")
+    )
+}
+# Choose database type based on environment variable
+# DATABASE_TYPE = env('DATABASE_TYPE', default='sqlite')
+
+# if DATABASE_TYPE == 'postgresql':
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.postgresql',
+#             'NAME': env('DB_NAME', default='bilbackend_db'),
+#             'USER': env('DB_USER', default='bilbackend_user'),
+#             'PASSWORD': env('DB_PASSWORD', default=''),
+#             'HOST': env('DB_HOST', default='localhost'),
+#             'PORT': env('DB_PORT', default='5432'),
+#         }
+#     }
+# else:  # Default to SQLite
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': BASE_DIR / 'db.sqlite3',
+#         }
+#     }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -161,18 +171,37 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+AWS_ACCESS_KEY_ID = env('CLOUDFLARE_R2_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('CLOUDFLARE_R2_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = env('CLOUDFLARE_R2_BUCKET_NAME')
+AWS_S3_ENDPOINT_URL = env('CLOUDFLARE_R2_ENDPOINT_URL')
+CLOUDFLARE_R2_CUSTOM_DOMAIN = env('CLOUDFLARE_R2_CUSTOM_DOMAIN')
+
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",
+}
+AWS_DEFAULT_ACL = None
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_AUTH = False
+
+STATICFILES_STORAGE = 'api.storage_backends.StaticStorage'
+DEFAULT_FILE_STORAGE = 'api.storage_backends.MediaStorage'
+
+MEDIA_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/media/"
+STATIC_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/static/"
+
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For production
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-]
+# STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For production
+# STATICFILES_DIRS = [
+#     os.path.join(BASE_DIR, "static"),
+# ]
 
 # Media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# MEDIA_URL = '/media/'
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Login URLs
 LOGIN_URL = '/login/'
