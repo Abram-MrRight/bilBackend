@@ -184,14 +184,15 @@ AWS_DEFAULT_ACL = None
 AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = False
 
-STATICFILES_STORAGE = 'api.storage_backends.StaticStorage'
+# STATICFILES_STORAGE = 'api.storage_backends.StaticStorage'
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'api.storage_backends.MediaStorage'
 
 MEDIA_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/media/"
-STATIC_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/static/"
+# STATIC_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/static/"
 
 # Static files (CSS, JavaScript, Images)
-# STATIC_URL = '/static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # STATICFILES_DIRS = [
 #     os.path.join(BASE_DIR, "static"),
