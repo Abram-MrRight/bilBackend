@@ -192,7 +192,7 @@ STATIC_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/static/"
 
 # Static files (CSS, JavaScript, Images)
 # STATIC_URL = '/static/'
-# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For production
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # STATICFILES_DIRS = [
 #     os.path.join(BASE_DIR, "static"),
 # ]
