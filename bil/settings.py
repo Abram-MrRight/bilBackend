@@ -188,7 +188,7 @@ AWS_QUERYSTRING_AUTH = False
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'api.storage_backends.MediaStorage'
 
-MEDIA_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/media/"
+MEDIA_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/"
 # STATIC_URL = f"https://{CLOUDFLARE_R2_CUSTOM_DOMAIN}/static/"
 
 # Static files (CSS, JavaScript, Images)
