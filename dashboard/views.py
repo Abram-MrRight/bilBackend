@@ -771,9 +771,51 @@ def admin_reports(request):
 @csrf_protect
 @login_required(login_url='admin_login')
 def admin_analytics(request):
-    data = Proof.objects.extra({'day': "date(created_at)"}).values('day').annotate(total=Count('id')).order_by('day')
-    return render(request, 'dashboard/analytics.html', {'data': data})
+    # Get transaction data
+    data = (
+        Proof.objects
+        .extra({'day': 'date(created_at)'})
+        .values('day')
+        .annotate(total=Count('id'))
+        .order_by('day')
+    )
 
+    # Handle case where there are no transactions
+    if not data.exists():
+        context = {
+            'data': [],
+            'currency_stats': [],
+            'total_transactions': 0,
+            'currency_count': 0,
+            'country_count': 0,
+            'period': request.GET.get('period', 'all'),
+            'base_currency': 'UGX',
+        }
+
+        return render(
+            request,
+            'dashboard/analytics.html',
+            context
+        )
+
+    # Existing data
+    context = {
+        'data': data,
+        'currency_stats': [],
+        'total_transactions': data.aggregate(
+            total=Count('total')
+        )['total'] or 0,
+        'currency_count': 0,
+        'country_count': 0,
+        'period': request.GET.get('period', 'all'),
+        'base_currency': 'UGX',
+    }
+
+    return render(
+        request,
+        'dashboard/analytics.html',
+        context
+    )
 
 @csrf_protect
 @login_required(login_url='admin_login')

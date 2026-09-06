@@ -3,7 +3,7 @@ name: Deploy bilBackend to Server
 on:
   push:
     branches:
-      - develop
+      - production
 
 jobs:
   build:
