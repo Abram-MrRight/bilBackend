@@ -200,20 +200,17 @@ def format_money(amount, decimals=4):
     amount = Decimal(amount).quantize(Decimal(f"1.{'0'*decimals}"), rounding=ROUND_HALF_UP)
     return f"{amount:,.{decimals}f}"
 def analytics_dashboard(request):
-    
+
     # BASE SETUP
-    
     base_currency_code = getattr(settings, 'BASE_CURRENCY', 'UGX')
 
     base_currency = Currency.objects.filter(
         code=base_currency_code
     ).first()
 
-    # fallback if configured currency does not exist
     if not base_currency:
         base_currency = Currency.objects.filter(code='UGX').first()
 
-    # final fallback
     if not base_currency:
         base_currency = Currency.objects.first()
 
@@ -221,8 +218,11 @@ def analytics_dashboard(request):
     date_filter = request.GET.get('period', 'all')
 
     start_date = None
+
     if date_filter == 'today':
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_date = now.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
     elif date_filter == 'week':
         start_date = now - timedelta(days=7)
     elif date_filter == 'month':
@@ -231,92 +231,124 @@ def analytics_dashboard(request):
         start_date = now - timedelta(days=365)
 
     transactions = Transaction.objects.all()
-    if start_date:
-        transactions = transactions.filter(confirmed_at__gte=start_date)
 
-    
-    # GLOBAL TOTALS (BASE CURRENCY)
-    
+    if start_date:
+        transactions = transactions.filter(
+            confirmed_at__gte=start_date
+        )
+
+    # GLOBAL TOTALS
     total_amount_base = Decimal(str(
-        transactions.aggregate(total=Sum('ugx_equivalent'))['total'] or 0
+        transactions.aggregate(
+            total=Sum('ugx_equivalent')
+        )['total'] or 0
     ))
 
     total_charges_base = Decimal(str(
-        transactions.aggregate(total=Sum('charge_amount'))['total'] or 0
+        transactions.aggregate(
+            total=Sum('charge_amount')
+        )['total'] or 0
     ))
 
     total_net_base = total_amount_base - total_charges_base
 
     overall_charge_rate = (
         (total_charges_base / total_amount_base) * Decimal('100')
-        if total_amount_base > 0 else Decimal('0')
+        if total_amount_base > 0
+        else Decimal('0')
     )
 
     # PER-CURRENCY STATISTICS
-    
     currency_stats = []
 
-    for currency in Currency.objects.all():
-        txs = transactions.filter(original_currency=currency)
-        if not txs.exists():
-            continue
+    # Only calculate currency conversion when a base currency exists
+    if base_currency:
+        for currency in Currency.objects.all():
 
-        total_original = Decimal(str(
-            txs.aggregate(total=Sum('original_amount'))['total'] or 0
-        ))
+            txs = transactions.filter(
+                original_currency=currency
+            )
 
-        total_charge = Decimal(str(
-            txs.aggregate(total=Sum('charge_amount'))['total'] or 0
-        ))
+            if not txs.exists():
+                continue
 
-        total_base = Decimal(str(
-            txs.aggregate(total=Sum('ugx_equivalent'))['total'] or 0
-        ))
+            total_original = Decimal(str(
+                txs.aggregate(
+                    total=Sum('original_amount')
+                )['total'] or 0
+            ))
 
-        avg_amount = Decimal(str(
-            txs.aggregate(avg=Avg('original_amount'))['avg'] or 0
-        ))
+            total_charge = Decimal(str(
+                txs.aggregate(
+                    total=Sum('charge_amount')
+                )['total'] or 0
+            ))
 
-        avg_charge = Decimal(str(
-            txs.aggregate(avg=Avg('charge_amount'))['avg'] or 0
-        ))
+            total_base = Decimal(str(
+                txs.aggregate(
+                    total=Sum('ugx_equivalent')
+                )['total'] or 0
+            ))
 
-        charge_rate = (
-            (total_charge / total_original) * Decimal('100')
-            if total_original > 0 else Decimal('0')
-        )
+            avg_amount = Decimal(str(
+                txs.aggregate(
+                    avg=Avg('original_amount')
+                )['avg'] or 0
+            ))
 
-        percentage = (
-            (total_base / total_amount_base) * Decimal('100')
-            if total_amount_base > 0 else Decimal('0')
-        )
+            avg_charge = Decimal(str(
+                txs.aggregate(
+                    avg=Avg('charge_amount')
+                )['avg'] or 0
+            ))
 
-         # SAFE exchange rate lookup
-        try:
-            exchange_rate = convert_currency(1, currency, base_currency)
-        except ExchangeRate.DoesNotExist:
-            exchange_rate = Decimal('0')
+            charge_rate = (
+                (total_charge / total_original) * Decimal('100')
+                if total_original > 0
+                else Decimal('0')
+            )
 
-        currency_stats.append({
-            'currency': currency.code,
-            'currency_name': currency.name,
-            'symbol': currency.symbol,
-            'count': txs.count(),
-            'total_amount': float(total_original),
-            'total_charge': float(total_charge),
-            'total_net': float(total_original - total_charge),
-            'avg_amount': float(avg_amount),
-            'avg_charge': float(avg_charge),
-            'base_amount': float(total_base),
-            'charge_rate': float(charge_rate),
-            'percentage': float(percentage),
-            'color': random_color(),
-            'exchange_rate': exchange_rate,
-        })
+            percentage = (
+                (total_base / total_amount_base) * Decimal('100')
+                if total_amount_base > 0
+                else Decimal('0')
+            )
 
-    
+            # SAFE exchange rate lookup
+            try:
+                exchange_rate = convert_currency(
+                    1,
+                    currency,
+                    base_currency
+                )
+            except (
+                ExchangeRate.DoesNotExist,
+                AttributeError,
+                TypeError,
+                ValueError
+            ):
+                exchange_rate = Decimal('0')
+
+            currency_stats.append({
+                'currency': currency.code,
+                'currency_name': currency.name,
+                'symbol': currency.symbol,
+                'count': txs.count(),
+                'total_amount': float(total_original),
+                'total_charge': float(total_charge),
+                'total_net': float(
+                    total_original - total_charge
+                ),
+                'avg_amount': float(avg_amount),
+                'avg_charge': float(avg_charge),
+                'base_amount': float(total_base),
+                'charge_rate': float(charge_rate),
+                'percentage': float(percentage),
+                'color': random_color(),
+                'exchange_rate': exchange_rate,
+            })
+
     # TOP STAFF PERFORMANCE
-    
     top_staff = transactions.exclude(
         confirmed_by__isnull=True
     ).values(
@@ -329,12 +361,13 @@ def analytics_dashboard(request):
         avg_amount=Avg('ugx_equivalent')
     ).order_by('-total_amount')[:5]
 
-    
-    # TRANSACTION TREND (LAST 7 DAYS)
-    
+    # TRANSACTION TREND - LAST 7 DAYS
     trend_data = []
+
     for i in range(6, -1, -1):
+
         day = now - timedelta(days=i)
+
         day_total = transactions.filter(
             confirmed_at__date=day.date()
         ).aggregate(
@@ -346,66 +379,79 @@ def analytics_dashboard(request):
             'amount': float(day_total),
         })
 
-    
     # ADDITIONAL METRICS
-    
     active_countries = Country.objects.filter(
         id__in=transactions.exclude(
             country__isnull=True
-        ).values_list('country', flat=True).distinct()
+        ).values_list(
+            'country',
+            flat=True
+        ).distinct()
     )
 
     total_transactions = transactions.count()
 
     avg_amount = Decimal(str(
-        transactions.aggregate(avg=Avg('ugx_equivalent'))['avg'] or 0
+        transactions.aggregate(
+            avg=Avg('ugx_equivalent')
+        )['avg'] or 0
     ))
 
     avg_charge = Decimal(str(
-        transactions.aggregate(avg=Avg('charge_amount'))['avg'] or 0
+        transactions.aggregate(
+            avg=Avg('charge_amount')
+        )['avg'] or 0
     ))
 
-    
     # CONTEXT
-    
     context = {
-        # Base totals
-        'base_currency': base_currency.code,
+        'base_currency': (
+            base_currency.code
+            if base_currency
+            else base_currency_code
+        ),
+
         'total_amount_base': total_amount_base,
         'total_charges_base': total_charges_base,
         'total_net_base': total_net_base,
         'overall_charge_rate': overall_charge_rate,
 
-        # Counts
         'total_transactions': total_transactions,
         'currency_count': len(currency_stats),
         'country_count': active_countries.count(),
+
         'staff_count': transactions.exclude(
             confirmed_by__isnull=True
-        ).values('confirmed_by').distinct().count(),
+        ).values(
+            'confirmed_by'
+        ).distinct().count(),
 
-        # Currency analytics
         'currency_stats': currency_stats,
 
-        # Staff & trends
         'top_staff': top_staff,
+
         'trend_data': json.dumps(trend_data),
 
-        # Reference data
         'active_countries': active_countries,
-        'exchange_rates': ExchangeRate.objects.all().order_by('created_at'),
+
+        'exchange_rates': ExchangeRate.objects.all().order_by(
+            'created_at'
+        ),
+
         'all_currencies': Currency.objects.all(),
 
-        # Averages
         'avg_amount': avg_amount,
         'avg_charge': avg_charge,
 
-        # UI
         'period': date_filter,
         'last_update': now,
     }
 
-    return render(request, 'dashboard/analytics.html', context)
+    return render(
+        request,
+        'dashboard/analytics.html',
+        context
+    )
 
 def get_color_for_currency(currency_code):
     """Assign consistent colors for currencies"""
